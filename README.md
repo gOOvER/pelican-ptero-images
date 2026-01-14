@@ -215,6 +215,7 @@ periodically to ensure dependencies are always up-to-date.
 | java:22 | `ghcr.io/goover/java:22` | ✅ | ✅ |
 | java:23 | `ghcr.io/goover/java:23` | ✅ | ✅ |
 | java:24 | `ghcr.io/goover/java:24` | ✅ | ✅ |
+| java:25 | `ghcr.io/goover/java:25` | ✅ | ✅ |
 
 ---
 
@@ -249,6 +250,7 @@ periodically to ensure dependencies are always up-to-date.
 | java:corretto_21 | `ghcr.io/goover/java:corretto_21` | ✅ | ✅ |
 | java:corretto_23 | `ghcr.io/goover/java:corretto_23` | ✅ | ✅ |
 | java:corretto_24 | `ghcr.io/goover/java:corretto_24` | ✅ | ✅ |
+| java:corretto_25 | `ghcr.io/goover/java:corretto_25` | ✅ | ✅ |
 
 ---
 
@@ -304,6 +306,8 @@ periodically to ensure dependencies are always up-to-date.
 | java:liberica_17 | `ghcr.io/goover/java:liberica_17` | ✅ | ✅ |
 | java:liberica_21 | `ghcr.io/goover/java:liberica_21` | ✅ | ✅ |
 | java:liberica_23 | `ghcr.io/goover/java:liberica_23` | ✅ | ✅ |
+| java:liberica_24 | `ghcr.io/goover/java:liberica_24` | ✅ | ✅ |
+| java:liberica_25 | `ghcr.io/goover/java:liberica_25` | ✅ | ✅ |
 
 ---
 
@@ -319,6 +323,7 @@ periodically to ensure dependencies are always up-to-date.
 | java:shenandoah_11 | `ghcr.io/goover/java:shenandoah_11` | ✅ | ✅ |
 | java:shenandoah_17 | `ghcr.io/goover/java:shenandoah_17` | ✅ | ✅ |
 | java:shenandoah_21 | `ghcr.io/goover/java:shenandoah_21` | ✅ | ✅ |
+| java:shenandoah_25 | `ghcr.io/goover/java:shenandoah_25` | ✅ | ✅ |
 
 ---
 
