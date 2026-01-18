@@ -94,6 +94,21 @@ line "CYAN"
 msg CYAN "Runtime Information:"
 java -version 2>&1 | sed "s/^/  /"
 
+# Detect CPU architecture
+ARCH=$(uname -m)
+case "$ARCH" in
+    x86_64)
+        ARCH_DISPLAY="AMD64 (x86_64)"
+        ;;
+    aarch64)
+        ARCH_DISPLAY="ARM64 (aarch64)"
+        ;;
+    *)
+        ARCH_DISPLAY="$ARCH (unknown)"
+        ;;
+esac
+msg CYAN "System Architecture: $ARCH_DISPLAY"
+
 # Check for downloader updates first thing
 line "BLUE"
 if [ -f "$DOWNLOADER_BIN" ]; then
