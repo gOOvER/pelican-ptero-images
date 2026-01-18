@@ -424,7 +424,6 @@ manage_psaver() {
 }
 
 # --- Hytale API authentication helpers (Device Code Flow + session creation) ---
-msg BLUE "OAuth & Session Setup"
 line "BLUE"
 
 json_field_string() {
