@@ -573,28 +573,14 @@ fetch_profile_uuid() {
         return 0
     fi
 
+    auth_log "DEBUG" "Profiles API response: $profiles_resp"
+
     HYTALE_PROFILE_UUID=$(printf '%s' "$profiles_resp" | json_first_uuid)
 
     if [ -z "$HYTALE_PROFILE_UUID" ]; then
         msg RED "[auth] No profile UUID found"
         auth_log "ERROR" "No profile UUID found in profiles response"
         return 1
-    fi
-
-    # Check for valid license status in profiles response
-    local license_valid
-    license_valid=$(printf '%s' "$profiles_resp" | sed -n 's/.*"hasGameLicense"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p')
-
-    if [ "$license_valid" = "false" ]; then
-        msg RED "[auth] No valid Hytale license found"
-        auth_log "ERROR" "Account does not have a valid Hytale license"
-        return 1
-    fi
-
-    if [ -z "$license_valid" ]; then
-        auth_log "INFO" "Could not determine license status from profile response"
-    else
-        auth_log "INFO" "Valid Hytale license detected"
     fi
 
     auth_log "INFO" "Profile UUID fetched: $HYTALE_PROFILE_UUID"
@@ -608,11 +594,16 @@ create_game_session() {
         -H "Content-Type: application/json" \
         -d '{"uuid":"'"$HYTALE_PROFILE_UUID"'"}')
 
+    if [ -z "$session_resp" ]; then
+        msg RED "[auth] Failed to create game session - empty response"
+        auth_log "ERROR" "Failed to create game session - empty response"
+        return 1
+    fi
+
+    auth_log "DEBUG" "Session API response: $session_resp"
+
     HYTALE_SESSION_TOKEN=$(printf '%s' "$session_resp" | json_field_string "sessionToken")
     HYTALE_IDENTITY_TOKEN=$(printf '%s' "$session_resp" | json_field_string "identityToken")
-    local expires_at
-    expires_at=$(printf '%s' "$session_resp" | json_field_string "expiresAt")
-    HYTALE_SESSION_EXPIRES=$(iso_to_epoch "$expires_at")
 
     if [ -z "$HYTALE_SESSION_TOKEN" ] || [ -z "$HYTALE_IDENTITY_TOKEN" ]; then
         msg RED "[auth] Failed to create game session"
@@ -620,8 +611,17 @@ create_game_session() {
         return 1
     fi
 
-    msg GREEN "[auth] Game session created (expires at $expires_at)"
-    auth_log "INFO" "Game session created (expires at $expires_at)"
+    local expires_at
+    expires_at=$(printf '%s' "$session_resp" | json_field_string "expiresAt")
+    if [ -n "$expires_at" ]; then
+        HYTALE_SESSION_EXPIRES=$(iso_to_epoch "$expires_at")
+        msg GREEN "[auth] Game session created (expires at $expires_at)"
+        auth_log "INFO" "Game session created (expires at $expires_at)"
+    else
+        msg GREEN "[auth] Game session created"
+        auth_log "INFO" "Game session created successfully"
+        HYTALE_SESSION_EXPIRES=$(($(date +%s) + 3600))
+    fi
     return 0
 
 }
@@ -636,6 +636,14 @@ refresh_game_session() {
     resp=$(curl -s -X POST "$HYTALE_SESSION_REFRESH_URL" \
         -H "Authorization: Bearer $HYTALE_SESSION_TOKEN")
 
+    if [ -z "$resp" ]; then
+        msg RED "[auth] Failed to refresh game session - empty response"
+        auth_log "ERROR" "Failed to refresh game session - empty response"
+        return 1
+    fi
+
+    auth_log "DEBUG" "Refresh Session API response: $resp"
+
     local new_session
     new_session=$(printf '%s' "$resp" | json_field_string "sessionToken")
     if [ -n "$new_session" ]; then
@@ -646,9 +654,6 @@ refresh_game_session() {
     if [ -n "$new_identity" ]; then
         HYTALE_IDENTITY_TOKEN="$new_identity"
     fi
-    local expires_at
-    expires_at=$(printf '%s' "$resp" | json_field_string "expiresAt")
-    HYTALE_SESSION_EXPIRES=$(iso_to_epoch "$expires_at")
 
     if [ -z "$HYTALE_SESSION_TOKEN" ] || [ -z "$HYTALE_IDENTITY_TOKEN" ]; then
         msg RED "[auth] Failed to refresh game session"
@@ -656,8 +661,17 @@ refresh_game_session() {
         return 1
     fi
 
-    msg GREEN "[auth] Game session refreshed (expires at $expires_at)"
-    auth_log "INFO" "Game session refreshed (expires at $expires_at)"
+    local expires_at
+    expires_at=$(printf '%s' "$resp" | json_field_string "expiresAt")
+    if [ -n "$expires_at" ]; then
+        HYTALE_SESSION_EXPIRES=$(iso_to_epoch "$expires_at")
+        msg GREEN "[auth] Game session refreshed (expires at $expires_at)"
+        auth_log "INFO" "Game session refreshed (expires at $expires_at)"
+    else
+        msg GREEN "[auth] Game session refreshed"
+        auth_log "INFO" "Game session refreshed successfully"
+        HYTALE_SESSION_EXPIRES=$(($(date +%s) + 3600))
+    fi
     return 0
 }
 
