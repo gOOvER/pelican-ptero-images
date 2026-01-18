@@ -67,6 +67,8 @@ HYTALE_SESSION_URL="https://sessions.hytale.com/game-session/new"
 HYTALE_SESSION_REFRESH_URL="https://sessions.hytale.com/game-session/refresh"
 HYTALE_DEVICE_POLL_INTERVAL=5
 HYTALE_TOKEN_EXPIRY_BUFFER=300
+HYTALE_ACCESS_EXPIRES=0
+HYTALE_SESSION_EXPIRES=0
 
 # Plugin Configuration
 PSAVER=${PSAVER:-0}
@@ -115,7 +117,6 @@ line "BLUE"
 if [ -f "$DOWNLOADER_BIN" ]; then
     msg BLUE "[startup] Checking for downloader updates..."
     if "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -check-update 2>&1 | sed "s/.*/  ${CYAN}&${NC}/"; then
-        msg GREEN "  ✓ Downloader is up to date"
         if [ -f "$CREDENTIALS_PATH" ]; then
             msg GREEN "  ✓ Valid downloader auth file found"
         fi
