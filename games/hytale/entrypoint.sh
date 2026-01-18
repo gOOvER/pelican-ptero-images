@@ -128,6 +128,10 @@ if [ -f "$DOWNLOADER_BIN" ]; then
     if "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -check-update 2>&1 | sed "s/.*/  ${CYAN}&${NC}/"; then
         if [ -f "$CREDENTIALS_PATH" ]; then
             msg GREEN "  ✓ Valid downloader auth file found"
+            # Validate credentials and show expiry
+            if validate_downloader_credentials 2>/dev/null; then
+                : # Validation message already shown by the function
+            fi
         fi
     else
         msg YELLOW "  Note: Downloader update check completed"
@@ -207,11 +211,11 @@ validate_downloader_credentials() {
     if [ $((expires_at - now)) -gt 0 ]; then
         local remaining
         remaining=$(format_expiry "$expires_at")
-        msg GREEN "[auth] Downloader credentials valid - expires: $remaining"
+        msg GREEN "  ✓ Credentials valid - expires: $remaining"
         auth_log "INFO" "Downloader credentials valid - expires at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
         return 0
     else
-        msg YELLOW "[auth] Downloader credentials expired, will be regenerated on next use"
+        msg YELLOW "  ⚠ Credentials expired, will be regenerated on next use"
         auth_log "WARN" "Downloader credentials expired at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
         return 1
     fi
@@ -224,16 +228,12 @@ initialize_credentials() {
         "$DOWNLOADER_BIN" -print-version -skip-update-check 2>&1 | sed "s/.*/  ${CYAN}&${NC}/"
         if [ -f "$CREDENTIALS_PATH" ]; then
             msg GREEN "  ✓ Credentials file created"
-            validate_downloader_credentials || true
             if [[ ! " ${DOWNLOADER_ARGS[*]} " =~ " -credentials-path " ]]; then
                 DOWNLOADER_ARGS+=("-credentials-path" "$CREDENTIALS_PATH")
             fi
         else
             msg YELLOW "  Note: Credentials file not created yet; continuing without it"
         fi
-    else
-        # Validate existing credentials
-        validate_downloader_credentials || true
     fi
 }
 
