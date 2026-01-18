@@ -565,6 +565,9 @@ fetch_profile_uuid() {
         return 1
     fi
 
+    # Debug: Show full profiles response for license check
+    auth_log "INFO" "Profiles response: $profiles_resp"
+
     if [ -n "$HYTALE_PROFILE_UUID" ]; then
         auth_log "INFO" "Using pre-configured profile UUID"
         return 0
@@ -577,6 +580,23 @@ fetch_profile_uuid() {
         auth_log "ERROR" "No profile UUID found in profiles response"
         return 1
     fi
+
+    # Check for valid license status in profiles response
+    local license_valid
+    license_valid=$(printf '%s' "$profiles_resp" | sed -n 's/.*"hasGameLicense"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p')
+
+    if [ "$license_valid" = "false" ]; then
+        msg RED "[auth] No valid Hytale license found"
+        auth_log "ERROR" "Account does not have a valid Hytale license"
+        return 1
+    fi
+
+    if [ -z "$license_valid" ]; then
+        auth_log "INFO" "Could not determine license status from profile response"
+    else
+        auth_log "INFO" "Valid Hytale license detected"
+    fi
+
     auth_log "INFO" "Profile UUID fetched: $HYTALE_PROFILE_UUID"
     return 0
 }
