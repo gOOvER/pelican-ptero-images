@@ -119,23 +119,6 @@ case "$ARCH" in
 esac
 msg CYAN "System Architecture: $ARCH_DISPLAY"
 
-# Check for downloader updates first thing
-line "BLUE"
-msg  BLUE "Downloader Update Check"
-line "BLUE"
-if [ -f "$DOWNLOADER_BIN" ]; then
-    msg BLUE "[startup] Checking for downloader updates..."
-    if "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -check-update 2>&1 | sed "s/.*/  ${CYAN}&${NC}/"; then
-        if [ -f "$CREDENTIALS_PATH" ]; then
-            msg GREEN "  ✓ Valid downloader auth file found"
-            # Validate credentials and show expiry
-            validate_downloader_credentials || true
-        fi
-    else
-        msg YELLOW "  Note: Downloader update check completed"
-    fi
-fi
-
 # Function to install Hytale Downloader
 install_downloader() {
     msg YELLOW "[installer] Downloader not found, installing..."
@@ -234,6 +217,23 @@ initialize_credentials() {
         fi
     fi
 }
+
+# Check for downloader updates first thing
+line "BLUE"
+msg  BLUE "Downloader Update Check"
+line "BLUE"
+if [ -f "$DOWNLOADER_BIN" ]; then
+    msg BLUE "[startup] Checking for downloader updates..."
+    if "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -check-update 2>&1 | sed "s/.*/  ${CYAN}&${NC}/"; then
+        if [ -f "$CREDENTIALS_PATH" ]; then
+            msg GREEN "  ✓ Valid downloader auth file found"
+            # Validate credentials and show expiry
+            validate_downloader_credentials || true
+        fi
+    else
+        msg YELLOW "  Note: Downloader update check completed"
+    fi
+fi
 
 # Check for updates
 check_for_updates() {
