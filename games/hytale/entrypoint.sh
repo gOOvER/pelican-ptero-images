@@ -46,8 +46,6 @@ cd /home/container || exit 1
 rm -rf /home/container/.tmp
 mkdir -p /home/container/.tmp
 
-
-
 # Hytale Downloader Configuration
 DOWNLOADER_URL="https://downloader.hytale.com/hytale-downloader.zip"
 DOWNLOADER_BIN="${DOWNLOADER_BIN:-/home/container/hytale-downloader}"
@@ -131,7 +129,6 @@ install_downloader() {
     rm -rf "$TEMP_DIR"
     mkdir -p "$TEMP_DIR"
 
-    # Download downloader
     msg BLUE "[installer] Downloading downloader package..."
     if ! wget -O "$TEMP_DIR/downloader.zip" "$DOWNLOADER_URL"; then
         msg RED "Error: Failed to download Hytale Downloader"
@@ -139,7 +136,6 @@ install_downloader() {
         return 1
     fi
 
-    # Extract downloader
     msg BLUE "[installer] Extracting downloader..."
     if ! unzip -o "$TEMP_DIR/downloader.zip" -d "$TEMP_DIR"; then
         msg RED "Error: Failed to extract Hytale Downloader"
@@ -147,7 +143,6 @@ install_downloader() {
         return 1
     fi
 
-    # Copy to target location
     if [ -f "$TEMP_DIR/hytale-downloader" ]; then
         cp "$TEMP_DIR/hytale-downloader" "$DOWNLOADER_BIN"
         chmod +x "$DOWNLOADER_BIN"
@@ -158,21 +153,17 @@ install_downloader() {
         return 1
     fi
 
-    # Cleanup
     rm -rf "$TEMP_DIR"
     return 0
 }
 
 # Function to initialize credentials file if needed
 initialize_credentials() {
-    # If credentials file does not exist yet, trigger an initial run without args
-    # so the downloader can guide through device auth and create the file.
     if [ ! -f "$CREDENTIALS_PATH" ]; then
         msg BLUE "[auth] Initializing downloader to create credentials (one-time)..."
         "$DOWNLOADER_BIN" -print-version -skip-update-check 2>&1 | sed "s/.*/  ${CYAN}&${NC}/"
         if [ -f "$CREDENTIALS_PATH" ]; then
             msg GREEN "  ✓ Credentials file created"
-            # Add credentials to downloader args if not already present
             if [[ ! " ${DOWNLOADER_ARGS[*]} " =~ " -credentials-path " ]]; then
                 DOWNLOADER_ARGS+=("-credentials-path" "$CREDENTIALS_PATH")
             fi
@@ -193,7 +184,6 @@ check_for_updates() {
         fi
     fi
 
-    # Initialize credentials if needed
     initialize_credentials
 
     # Get current game version
@@ -221,7 +211,6 @@ download_hytale() {
         fi
     fi
 
-    # Initialize credentials if needed
     initialize_credentials
 
     # Check local version
@@ -247,28 +236,25 @@ download_hytale() {
 
     msg CYAN "  Remote version: $REMOTE_VERSION"
 
-    # Compare versions - if same, skip everything
     if [ "$LOCAL_VERSION" = "$REMOTE_VERSION" ] && [ -f "/home/container/HytaleServer.jar" ]; then
         msg GREEN "✓ Already running version $REMOTE_VERSION - no update needed"
         return 0
     fi
 
-    # Version is different, download and install
     msg BLUE "[update 2/3] Downloading Hytale build..."
 
+    # Create temporary directory for download
     # Create temporary directory for download
     DOWNLOAD_DIR="/home/container/.tmp/hytale-download"
     rm -rf "$DOWNLOAD_DIR"
     mkdir -p "$DOWNLOAD_DIR"
 
-    # Run downloader inside download dir so it names the zip itself
     if ! (cd "$DOWNLOAD_DIR" && "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -patchline "$PATCHLINE" -skip-update-check 2>&1 | sed "s/.*/  ${CYAN}&${NC}/"); then
         msg RED "Error: Hytale Downloader failed"
         rm -rf "$DOWNLOAD_DIR"
         return 1
     fi
 
-    # Locate downloaded zip (should be directly in DOWNLOAD_DIR)
     GAME_ZIP=$(find "$DOWNLOAD_DIR" -maxdepth 1 -name "*.zip" -type f | head -n 1)
 
     if [ -z "$GAME_ZIP" ] || [ ! -f "$GAME_ZIP" ]; then
@@ -277,7 +263,6 @@ download_hytale() {
         return 1
     fi
 
-    # Extract downloaded files
     msg BLUE "[update 3/3] Extracting and installing..."
     if ! unzip -o "$GAME_ZIP" -d "$DOWNLOAD_DIR"; then
         msg RED "Error: Failed to extract Hytale server files"
@@ -285,9 +270,7 @@ download_hytale() {
         return 1
     fi
 
-    # Copy Server folder contents and Assets.zip to container root
     if [ -d "$DOWNLOAD_DIR/Server" ]; then
-        # Move all files from Server folder to /home/container
         cp -r "$DOWNLOAD_DIR/Server/"* /home/container/ || return 1
         msg GREEN "  ✓ Server files installed"
     else
@@ -303,17 +286,11 @@ download_hytale() {
         msg YELLOW "Warning: Assets.zip not found in downloaded files"
     fi
 
-    # Save version
     echo "$REMOTE_VERSION" > "/home/container/.version"
-
-    # Cleanup
     rm -rf "$DOWNLOAD_DIR"
 
     msg GREEN "✓ Hytale server updated to version $REMOTE_VERSION"
-
-    # Clean up entire temp directory after successful installation
     rm -rf /home/container/.tmp
-
     return 0
 }
 
@@ -341,17 +318,11 @@ else
     fi
 fi
 
-# Function to manage Performance Saver plugin
-line "BLUE"
 manage_psaver() {
-    # Create mods directory if it doesn't exist
     mkdir -p "$PSAVER_PLUGINS_DIR"
 
     if [ "$PSAVER" = "1" ]; then
-        # PSAVER=1: Install and enable the plugin
         msg BLUE "[plugin] Checking Performance Saver plugin..."
-
-        # Check if a jar matching the pattern exists (enabled)
         EXISTING_JAR=$(find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -type f -name "${PSAVER_JAR_NAME}*.jar" ! -name "*.disabled" 2>/dev/null | head -n 1)
 
         if [ -n "$EXISTING_JAR" ]; then
@@ -359,7 +330,6 @@ manage_psaver() {
             return 0
         fi
 
-        # Check if a disabled version exists
         DISABLED_JAR=$(find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -type f -name "${PSAVER_JAR_NAME}*.jar.disabled" 2>/dev/null | head -n 1)
 
         if [ -n "$DISABLED_JAR" ]; then
@@ -369,13 +339,11 @@ manage_psaver() {
             return 0
         fi
 
-        # Download and install the plugin
         msg BLUE "  Downloading Performance Saver plugin..."
         TEMP_PSAVER_DIR="/home/container/.tmp/psaver-install"
         rm -rf "$TEMP_PSAVER_DIR"
         mkdir -p "$TEMP_PSAVER_DIR"
 
-        # Get latest release download URL
         DOWNLOAD_URL=$(wget -q -O - "$PSAVER_RELEASES_URL" 2>>"$ERROR_LOG" | sed -n 's/.*"browser_download_url":[[:space:]]*"\([^"]*\.jar\)".*/\1/p' | head -n 1)
 
         if [ -z "$DOWNLOAD_URL" ]; then
@@ -384,7 +352,6 @@ manage_psaver() {
             return 1
         fi
 
-        # Extract filename from URL
         PLUGIN_FILENAME=$(basename "$DOWNLOAD_URL")
 
         if ! wget -O "$TEMP_PSAVER_DIR/$PLUGIN_FILENAME" "$DOWNLOAD_URL" --ca-certificate=/etc/ssl/certs/ca-certificates.crt 2>>"$ERROR_LOG"; then
@@ -393,14 +360,12 @@ manage_psaver() {
             return 1
         fi
 
-        # Verify file integrity - ensure it's a valid JAR file
         if ! file "$TEMP_PSAVER_DIR/$PLUGIN_FILENAME" | grep -q "Java archive"; then
             msg RED "Error: Downloaded file is not a valid JAR archive"
             rm -rf "$TEMP_PSAVER_DIR"
             return 1
         fi
 
-        # Copy to mods directory
         if ! cp "$TEMP_PSAVER_DIR/$PLUGIN_FILENAME" "$PSAVER_PLUGINS_DIR/"; then
             msg RED "Error: Failed to install Performance Saver plugin (copy failed)"
             rm -rf "$TEMP_PSAVER_DIR"
@@ -411,7 +376,6 @@ manage_psaver() {
         return 0
 
     else
-        # PSAVER=0: Disable the plugin if it exists
         EXISTING_JAR=$(find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -type f -name "${PSAVER_JAR_NAME}*.jar" ! -name "*.disabled" 2>/dev/null | head -n 1)
 
         if [ -n "$EXISTING_JAR" ]; then
@@ -423,7 +387,16 @@ manage_psaver() {
     fi
 }
 
-# --- Hytale API authentication helpers (Device Code Flow + session creation) ---
+# Manage Performance Saver plugin
+line "BLUE"
+msg BLUE "Plugin Installation"
+line "BLUE"
+if [ "$PSAVER" = "1" ] || [ -n "$(find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -name "${PSAVER_JAR_NAME}*.jar*" -type f 2>/dev/null | head -1)" ]; then
+    manage_psaver || true
+fi
+
+line "BLUE"
+msg BLUE "OAuth & Session Setup"
 line "BLUE"
 
 json_field_string() {
@@ -442,20 +415,13 @@ json_first_uuid() {
 
 iso_to_epoch() {
     local iso="$1"
-    if [ -z "$iso" ]; then
-        echo 0
-        return
-    fi
-    # Requires GNU/busybox date with -d
+    [ -z "$iso" ] && echo 0 && return
     date -d "$iso" +%s 2>/dev/null || echo 0
 }
 
 format_expiry() {
     local ts="$1"
-    if [ -z "$ts" ] || [ "$ts" -le 0 ] 2>/dev/null; then
-        echo "unknown"
-        return
-    fi
+    [ -z "$ts" ] || [ "$ts" -le 0 ] 2>/dev/null && echo "unknown" && return
     local now diff h m s
     now=$(date +%s)
     diff=$((ts - now))
@@ -471,11 +437,7 @@ format_expiry() {
 }
 
 load_auth_state() {
-    if [ ! -f "$HYTALE_AUTH_STATE_PATH" ]; then
-        return 0
-    fi
-    # shellcheck source=/dev/null
-    . "$HYTALE_AUTH_STATE_PATH"
+    [ -f "$HYTALE_AUTH_STATE_PATH" ] && . "$HYTALE_AUTH_STATE_PATH"
 }
 
 write_auth_state() {
@@ -509,8 +471,6 @@ request_device_code() {
         msg RED "[auth] Failed to request device code"
         return 1
     fi
-
-    msg BLUE "[auth] Device authorization required"
     msg CYAN "  Visit: $VERIFY_URL"
     msg CYAN "  Code : $USER_CODE"
     return 0
@@ -706,9 +666,7 @@ ensure_session_tokens() {
 }
 
 run_hytale_api_auth() {
-    if [ "$HYTALE_API_AUTH" != "1" ]; then
-        return 0
-    fi
+    [ "$HYTALE_API_AUTH" != "1" ] && return 0
 
     msg BLUE "[auth] Hytale API authentication enabled"
 
@@ -741,14 +699,11 @@ run_hytale_api_auth() {
     msg GREEN "[auth] Tokens ready and exported"
     msg CYAN "  Access token valid: $(format_expiry "$HYTALE_ACCESS_EXPIRES")"
     msg CYAN "  Session token valid: $(format_expiry "$HYTALE_SESSION_EXPIRES")"
+
     msg BLUE "Server Ready for Startup"
     line "CYAN"
     return 0
 }
-# Manage Performance Saver plugin
-if [ "$PSAVER" = "1" ] || [ -n "$(find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -name "${PSAVER_JAR_NAME}*.jar*" -type f 2>/dev/null | head -1)" ]; then
-    manage_psaver || true
-fi
 
 # Acquire Hytale API tokens (device flow) and export to env if enabled
 if ! run_hytale_api_auth; then
