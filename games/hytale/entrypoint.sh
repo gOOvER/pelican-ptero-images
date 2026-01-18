@@ -46,9 +46,7 @@ cd /home/container || exit 1
 rm -rf /home/container/.tmp
 mkdir -p /home/container/.tmp
 
-# Print Java version
-echo "java -version"
-java -version
+
 
 # Hytale Downloader Configuration
 DOWNLOADER_URL="https://downloader.hytale.com/hytale-downloader.zip"
@@ -90,7 +88,14 @@ if [ -f "/home/container/.version" ]; then
     fi
 fi
 
+# Print Java version
+msg BLUE "System Information"
+line "CYAN"
+msg CYAN "Runtime Information:"
+java -version 2>&1 | sed "s/^/  /"
+
 # Check for downloader updates first thing
+line "BLUE"
 if [ -f "$DOWNLOADER_BIN" ]; then
     msg BLUE "[startup] Checking for downloader updates..."
     if "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -check-update 2>&1 | sed "s/.*/  ${CYAN}&${NC}/"; then
@@ -298,6 +303,7 @@ download_hytale() {
 }
 
 # Check for game files and handle AUTO_UPDATE
+line "BLUE"
 if [ "$AUTO_UPDATE" = "1" ]; then
     msg CYAN "Auto-update enabled, downloading latest version..."
     if download_hytale; then
@@ -321,6 +327,7 @@ else
 fi
 
 # Function to manage Performance Saver plugin
+line "BLUE"
 manage_psaver() {
     # Create mods directory if it doesn't exist
     mkdir -p "$PSAVER_PLUGINS_DIR"
@@ -402,6 +409,8 @@ manage_psaver() {
 }
 
 # --- Hytale API authentication helpers (Device Code Flow + session creation) ---
+msg BLUE "OAuth & Session Setup"
+line "BLUE"
 
 json_field_string() {
     local key="$1"
@@ -425,6 +434,26 @@ iso_to_epoch() {
     fi
     # Requires GNU/busybox date with -d
     date -d "$iso" +%s 2>/dev/null || echo 0
+}
+
+format_expiry() {
+    local ts="$1"
+    if [ -z "$ts" ] || [ "$ts" -le 0 ] 2>/dev/null; then
+        echo "unknown"
+        return
+    fi
+    local now diff h m s
+    now=$(date +%s)
+    diff=$((ts - now))
+    if [ "$diff" -lt 0 ]; then
+        diff=0
+    fi
+    h=$((diff / 3600))
+    m=$(((diff % 3600) / 60))
+    s=$((diff % 60))
+    local abs
+    abs=$(date -u -d @"$ts" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$ts")
+    printf "%dh %dm %ds (until %s)" "$h" "$m" "$s" "$abs"
 }
 
 load_auth_state() {
@@ -696,6 +725,10 @@ run_hytale_api_auth() {
     write_auth_state
 
     msg GREEN "[auth] Tokens ready and exported"
+    msg CYAN "  Access token valid: $(format_expiry "$HYTALE_ACCESS_EXPIRES")"
+    msg CYAN "  Session token valid: $(format_expiry "$HYTALE_SESSION_EXPIRES")"
+    msg BLUE "Server Ready for Startup"
+    line "CYAN"
     return 0
 }
 # Manage Performance Saver plugin
