@@ -170,35 +170,6 @@ install_downloader() {
     return 0
 }
 
-# Function to validate downloader credentials expiry
-validate_downloader_credentials() {
-    if [ ! -f "$CREDENTIALS_PATH" ]; then
-        return 1
-    fi
-
-    local expires_at
-    expires_at=$(grep -o '"expires_at":[0-9]\+' "$CREDENTIALS_PATH" | cut -d: -f2)
-
-    if [ -z "$expires_at" ] || [ "$expires_at" -le 0 ]; then
-        return 1
-    fi
-
-    local now
-    now=$(date +%s)
-
-    if [ $((expires_at - now)) -gt 0 ]; then
-        local remaining
-        remaining=$(format_expiry "$expires_at")
-        msg GREEN "[auth] Downloader credentials valid - expires: $remaining"
-        auth_log "INFO" "Downloader credentials valid - expires at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
-        return 0
-    else
-        msg YELLOW "[auth] Downloader credentials expired, will be regenerated on next use"
-        auth_log "WARN" "Downloader credentials expired at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
-        return 1
-    fi
-}
-
 # Function to initialize credentials file if needed
 initialize_credentials() {
     if [ ! -f "$CREDENTIALS_PATH" ]; then
@@ -233,12 +204,15 @@ check_for_updates() {
     initialize_credentials
 
     # Get current game version
-    CURRENT_VERSION=$(timeout 10 "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -print-version -skip-update-check 2>/dev/null \
-        | grep -v -i -E "$DOWNLOADER_OUTPUT_FILTER" \
-        | head -1)
+    DOWNLOADER_OUTPUT=$(timeout 10 "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -print-version -skip-update-check 2>&1)
 
+    # Extract version line, but show full output for debugging
+    CURRENT_VERSION=$(echo "$DOWNLOADER_OUTPUT" | grep -E "$VERSION_PATTERN" | head -1)
+
+    # If no version found, show the output to help diagnose issues
     if [ -z "$CURRENT_VERSION" ]; then
         msg YELLOW "Warning: Could not determine game version"
+        echo "$DOWNLOADER_OUTPUT" | sed "s/.*/  ${CYAN}&${NC}/"
         return 1
     fi
 
@@ -271,12 +245,15 @@ download_hytale() {
 
     # Get remote version without downloading
     msg BLUE "[update 1/3] Fetching remote version..."
-    REMOTE_VERSION=$(timeout 10 "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -patchline "$PATCHLINE" -print-version -skip-update-check 2>/dev/null \
-        | grep -v -i -E "$DOWNLOADER_OUTPUT_FILTER" \
-        | head -1)
+    DOWNLOADER_OUTPUT=$(timeout 10 "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -patchline "$PATCHLINE" -print-version -skip-update-check 2>&1)
 
+    # Extract version line, but show full output for debugging
+    REMOTE_VERSION=$(echo "$DOWNLOADER_OUTPUT" | grep -E "$VERSION_PATTERN" | head -1)
+
+    # If no version found, show the output to help diagnose issues
     if [ -z "$REMOTE_VERSION" ]; then
         msg RED "Error: Could not determine remote version"
+        echo "$DOWNLOADER_OUTPUT" | sed "s/.*/  ${CYAN}&${NC}/"
         return 1
     fi
 
@@ -480,6 +457,35 @@ format_expiry() {
     local abs
     abs=$(date -u -d @"$ts" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$ts")
     printf "%dh %dm %ds (until %s)" "$h" "$m" "$s" "$abs"
+}
+
+# Function to validate downloader credentials expiry
+validate_downloader_credentials() {
+    if [ ! -f "$CREDENTIALS_PATH" ]; then
+        return 1
+    fi
+
+    local expires_at
+    expires_at=$(grep -o '"expires_at":[0-9]\+' "$CREDENTIALS_PATH" | cut -d: -f2)
+
+    if [ -z "$expires_at" ] || [ "$expires_at" -le 0 ]; then
+        return 1
+    fi
+
+    local now
+    now=$(date +%s)
+
+    if [ $((expires_at - now)) -gt 0 ]; then
+        local remaining
+        remaining=$(format_expiry "$expires_at")
+        msg GREEN "[auth] Downloader credentials valid - expires: $remaining"
+        auth_log "INFO" "Downloader credentials valid - expires at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
+        return 0
+    else
+        msg YELLOW "[auth] Downloader credentials expired, will be regenerated on next use"
+        auth_log "WARN" "Downloader credentials expired at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
+        return 1
+    fi
 }
 
 load_auth_state() {
