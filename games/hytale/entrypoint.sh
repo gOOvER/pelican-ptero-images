@@ -86,7 +86,8 @@ if [ -f "/home/container/.version" ]; then
     fi
 fi
 
-# Print Java version
+# Java version
+line "CYAN"
 msg BLUE "System Information"
 line "CYAN"
 msg CYAN "Runtime Information:"
@@ -109,6 +110,8 @@ msg CYAN "System Architecture: $ARCH_DISPLAY"
 
 # Check for downloader updates first thing
 line "BLUE"
+msg  BLUE "Downloader Update Check"
+line "BLUE"
 if [ -f "$DOWNLOADER_BIN" ]; then
     msg BLUE "[startup] Checking for downloader updates..."
     if "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -check-update 2>&1 | sed "s/.*/  ${CYAN}&${NC}/"; then
@@ -123,7 +126,7 @@ fi
 
 # Function to install Hytale Downloader
 install_downloader() {
-    msg BLUE "[installer] Downloader not found, installing..."
+    msg RED "[installer] Downloader not found, installing..."
 
     local TEMP_DIR="/home/container/.tmp/hytale-downloader-install"
     rm -rf "$TEMP_DIR"
@@ -295,6 +298,8 @@ download_hytale() {
 }
 
 # Check for game files and handle AUTO_UPDATE
+line "BLUE"
+msg BLUE "Hytale Gamefiles Update Check"
 line "BLUE"
 if [ "$AUTO_UPDATE" = "1" ]; then
     msg CYAN "Auto-update enabled, downloading latest version..."
