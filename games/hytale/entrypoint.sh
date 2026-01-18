@@ -13,6 +13,7 @@ CYAN=$(tput setaf 6 2>/dev/null || echo '')
 NC=$(tput sgr0 2>/dev/null || echo '')
 
 ERROR_LOG="/home/container/install_error.log"
+AUTH_LOG="/home/container/.hytale-auth.log"
 
 # Message helpers
 msg() {
@@ -33,6 +34,14 @@ line() {
     local sep
     sep=$(printf '%*s' "$term_width" '' | tr ' ' '-')
     msg "$color" "$sep"
+}
+
+auth_log() {
+    local level="$1"
+    shift
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    printf "[%s] [%s] %s\n" "$timestamp" "$level" "$*" >> "$AUTH_LOG"
 }
 
 # Set environment variable that holds the Internal Docker IP
@@ -127,7 +136,7 @@ fi
 
 # Function to install Hytale Downloader
 install_downloader() {
-    msg RED "[installer] Downloader not found, installing..."
+    msg YELLOW "[installer] Downloader not found, installing..."
 
     local TEMP_DIR="/home/container/.tmp/hytale-downloader-install"
     rm -rf "$TEMP_DIR"
@@ -348,7 +357,7 @@ manage_psaver() {
         rm -rf "$TEMP_PSAVER_DIR"
         mkdir -p "$TEMP_PSAVER_DIR"
 
-        DOWNLOAD_URL=$(wget -q -O - "$PSAVER_RELEASES_URL" 2>>"$ERROR_LOG" | sed -n 's/.*"browser_download_url":[[:space:]]*"\([^"]*\.jar\)".*/\1/p' | head -n 1)
+        DOWNLOAD_URL=$(wget -q -O - "$PSAVER_RELEASES_URL" 2>/dev/null | sed -n 's/.*"browser_download_url":[[:space:]]*"\([^"]*\.jar\)".*/\1/p' | head -n 1)
 
         if [ -z "$DOWNLOAD_URL" ]; then
             msg RED "Error: Could not fetch Performance Saver plugin release"
@@ -358,7 +367,7 @@ manage_psaver() {
 
         PLUGIN_FILENAME=$(basename "$DOWNLOAD_URL")
 
-        if ! wget -O "$TEMP_PSAVER_DIR/$PLUGIN_FILENAME" "$DOWNLOAD_URL" --ca-certificate=/etc/ssl/certs/ca-certificates.crt 2>>"$ERROR_LOG"; then
+        if ! wget -O "$TEMP_PSAVER_DIR/$PLUGIN_FILENAME" "$DOWNLOAD_URL" --ca-certificate=/etc/ssl/certs/ca-certificates.crt 2>/dev/null; then
             msg RED "Error: Failed to download Performance Saver plugin"
             rm -rf "$TEMP_PSAVER_DIR"
             return 1
@@ -473,8 +482,10 @@ request_device_code() {
 
     if [ -z "$DEVICE_CODE" ] || [ -z "$USER_CODE" ] || [ -z "$VERIFY_URL" ]; then
         msg RED "[auth] Failed to request device code"
+        auth_log "ERROR" "Failed to request device code"
         return 1
     fi
+    auth_log "INFO" "Device code requested successfully"
     msg CYAN "  Visit: $VERIFY_URL"
     msg CYAN "  Code : $USER_CODE"
     return 0
@@ -511,6 +522,7 @@ poll_for_tokens() {
         local now
         now=$(date +%s)
         HYTALE_ACCESS_EXPIRES=$((now + expires_in))
+        auth_log "INFO" "Tokens acquired via device code flow"
         return 0
     done
 }
@@ -527,6 +539,7 @@ refresh_access_token() {
     new_access=$(printf '%s' "$resp" | json_field_string "access_token")
     if [ -z "$new_access" ]; then
         msg RED "[auth] Failed to refresh OAuth token"
+        auth_log "ERROR" "Failed to refresh OAuth token"
         return 1
     fi
 
@@ -537,6 +550,7 @@ refresh_access_token() {
     now=$(date +%s)
     HYTALE_ACCESS_EXPIRES=$((now + expires_in))
     msg GREEN "[auth] OAuth token refreshed"
+    auth_log "INFO" "OAuth token refreshed"
     return 0
 }
 
@@ -547,10 +561,12 @@ fetch_profile_uuid() {
 
     if [ -z "$profiles_resp" ]; then
         msg RED "[auth] Failed to fetch profiles"
+        auth_log "ERROR" "Failed to fetch profiles"
         return 1
     fi
 
     if [ -n "$HYTALE_PROFILE_UUID" ]; then
+        auth_log "INFO" "Using pre-configured profile UUID"
         return 0
     fi
 
@@ -558,8 +574,10 @@ fetch_profile_uuid() {
 
     if [ -z "$HYTALE_PROFILE_UUID" ]; then
         msg RED "[auth] No profile UUID found"
+        auth_log "ERROR" "No profile UUID found in profiles response"
         return 1
     fi
+    auth_log "INFO" "Profile UUID fetched: $HYTALE_PROFILE_UUID"
     return 0
 }
 
@@ -578,10 +596,12 @@ create_game_session() {
 
     if [ -z "$HYTALE_SESSION_TOKEN" ] || [ -z "$HYTALE_IDENTITY_TOKEN" ]; then
         msg RED "[auth] Failed to create game session"
+        auth_log "ERROR" "Failed to create game session"
         return 1
     fi
 
     msg GREEN "[auth] Game session created (expires at $expires_at)"
+    auth_log "INFO" "Game session created (expires at $expires_at)"
     return 0
 
 }
@@ -612,10 +632,12 @@ refresh_game_session() {
 
     if [ -z "$HYTALE_SESSION_TOKEN" ] || [ -z "$HYTALE_IDENTITY_TOKEN" ]; then
         msg RED "[auth] Failed to refresh game session"
+        auth_log "ERROR" "Failed to refresh game session"
         return 1
     fi
 
     msg GREEN "[auth] Game session refreshed (expires at $expires_at)"
+    auth_log "INFO" "Game session refreshed (expires at $expires_at)"
     return 0
 }
 
@@ -673,16 +695,19 @@ run_hytale_api_auth() {
     [ "$HYTALE_API_AUTH" != "1" ] && return 0
 
     msg BLUE "[auth] Hytale API authentication enabled"
+    auth_log "INFO" "Starting Hytale API authentication"
 
     load_auth_state
 
     if ! ensure_oauth_tokens; then
         msg RED "[auth] OAuth acquisition failed"
+        auth_log "ERROR" "OAuth acquisition failed"
         return 1
     fi
 
     if ! ensure_session_tokens; then
         msg RED "[auth] Session acquisition failed"
+        auth_log "ERROR" "Session acquisition failed"
         return 1
     fi
 
@@ -703,6 +728,7 @@ run_hytale_api_auth() {
     msg GREEN "[auth] Tokens ready and exported"
     msg CYAN "  Access token valid: $(format_expiry "$HYTALE_ACCESS_EXPIRES")"
     msg CYAN "  Session token valid: $(format_expiry "$HYTALE_SESSION_EXPIRES")"
+    auth_log "INFO" "Authentication successful - tokens exported"
 
     msg BLUE "Server Ready for Startup"
     line "CYAN"
