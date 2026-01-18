@@ -129,9 +129,7 @@ if [ -f "$DOWNLOADER_BIN" ]; then
         if [ -f "$CREDENTIALS_PATH" ]; then
             msg GREEN "  ✓ Valid downloader auth file found"
             # Validate credentials and show expiry
-            if validate_downloader_credentials 2>/dev/null; then
-                : # Validation message already shown by the function
-            fi
+            validate_downloader_credentials || true
         fi
     else
         msg YELLOW "  Note: Downloader update check completed"
