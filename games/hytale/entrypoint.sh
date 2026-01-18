@@ -170,6 +170,35 @@ install_downloader() {
     return 0
 }
 
+# Function to validate downloader credentials expiry
+validate_downloader_credentials() {
+    if [ ! -f "$CREDENTIALS_PATH" ]; then
+        return 1
+    fi
+
+    local expires_at
+    expires_at=$(grep -o '"expires_at":[0-9]\+' "$CREDENTIALS_PATH" | cut -d: -f2)
+
+    if [ -z "$expires_at" ] || [ "$expires_at" -le 0 ]; then
+        return 1
+    fi
+
+    local now
+    now=$(date +%s)
+
+    if [ $((expires_at - now)) -gt 0 ]; then
+        local remaining
+        remaining=$(format_expiry "$expires_at")
+        msg GREEN "[auth] Downloader credentials valid - expires: $remaining"
+        auth_log "INFO" "Downloader credentials valid - expires at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
+        return 0
+    else
+        msg YELLOW "[auth] Downloader credentials expired, will be regenerated on next use"
+        auth_log "WARN" "Downloader credentials expired at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
+        return 1
+    fi
+}
+
 # Function to initialize credentials file if needed
 initialize_credentials() {
     if [ ! -f "$CREDENTIALS_PATH" ]; then
@@ -177,12 +206,16 @@ initialize_credentials() {
         "$DOWNLOADER_BIN" -print-version -skip-update-check 2>&1 | sed "s/.*/  ${CYAN}&${NC}/"
         if [ -f "$CREDENTIALS_PATH" ]; then
             msg GREEN "  ✓ Credentials file created"
+            validate_downloader_credentials || true
             if [[ ! " ${DOWNLOADER_ARGS[*]} " =~ " -credentials-path " ]]; then
                 DOWNLOADER_ARGS+=("-credentials-path" "$CREDENTIALS_PATH")
             fi
         else
             msg YELLOW "  Note: Credentials file not created yet; continuing without it"
         fi
+    else
+        # Validate existing credentials
+        validate_downloader_credentials || true
     fi
 }
 
@@ -442,7 +475,7 @@ format_expiry() {
         diff=0
     fi
     h=$((diff / 3600))
-    m=$(((diff % 3600) / 60))
+    m=$((diff / 60 % 60))
     s=$((diff % 60))
     local abs
     abs=$(date -u -d @"$ts" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$ts")
