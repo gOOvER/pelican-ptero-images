@@ -303,9 +303,7 @@ msg BLUE "Hytale Gamefiles Update Check"
 line "BLUE"
 if [ "$AUTO_UPDATE" = "1" ]; then
     msg CYAN "Auto-update enabled, downloading latest version..."
-    if download_hytale; then
-        msg GREEN "✓ Server ready to start"
-    else
+    if ! download_hytale; then
         msg RED "Error: Auto-update failed, server will not start"
         exit 1
     fi
