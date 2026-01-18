@@ -170,6 +170,35 @@ install_downloader() {
     return 0
 }
 
+# Function to validate downloader credentials expiry (must be defined before initialize_credentials)
+validate_downloader_credentials() {
+    if [ ! -f "$CREDENTIALS_PATH" ]; then
+        return 1
+    fi
+
+    local expires_at
+    expires_at=$(grep -o '"expires_at":[0-9]\+' "$CREDENTIALS_PATH" | cut -d: -f2)
+
+    if [ -z "$expires_at" ] || [ "$expires_at" -le 0 ]; then
+        return 1
+    fi
+
+    local now
+    now=$(date +%s)
+
+    if [ $((expires_at - now)) -gt 0 ]; then
+        local remaining
+        remaining=$(format_expiry "$expires_at")
+        msg GREEN "[auth] Downloader credentials valid - expires: $remaining"
+        auth_log "INFO" "Downloader credentials valid - expires at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
+        return 0
+    else
+        msg YELLOW "[auth] Downloader credentials expired, will be regenerated on next use"
+        auth_log "WARN" "Downloader credentials expired at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
+        return 1
+    fi
+}
+
 # Function to initialize credentials file if needed
 initialize_credentials() {
     if [ ! -f "$CREDENTIALS_PATH" ]; then
@@ -457,35 +486,6 @@ format_expiry() {
     local abs
     abs=$(date -u -d @"$ts" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$ts")
     printf "%dh %dm %ds (until %s)" "$h" "$m" "$s" "$abs"
-}
-
-# Function to validate downloader credentials expiry
-validate_downloader_credentials() {
-    if [ ! -f "$CREDENTIALS_PATH" ]; then
-        return 1
-    fi
-
-    local expires_at
-    expires_at=$(grep -o '"expires_at":[0-9]\+' "$CREDENTIALS_PATH" | cut -d: -f2)
-
-    if [ -z "$expires_at" ] || [ "$expires_at" -le 0 ]; then
-        return 1
-    fi
-
-    local now
-    now=$(date +%s)
-
-    if [ $((expires_at - now)) -gt 0 ]; then
-        local remaining
-        remaining=$(format_expiry "$expires_at")
-        msg GREEN "[auth] Downloader credentials valid - expires: $remaining"
-        auth_log "INFO" "Downloader credentials valid - expires at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
-        return 0
-    else
-        msg YELLOW "[auth] Downloader credentials expired, will be regenerated on next use"
-        auth_log "WARN" "Downloader credentials expired at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
-        return 1
-    fi
 }
 
 load_auth_state() {
