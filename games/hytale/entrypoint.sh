@@ -170,6 +170,24 @@ install_downloader() {
     return 0
 }
 
+# Helper function for time formatting (must be defined early for validation functions)
+format_expiry() {
+    local ts="$1"
+    [ -z "$ts" ] || [ "$ts" -le 0 ] 2>/dev/null && echo "unknown" && return
+    local now diff h m s
+    now=$(date +%s)
+    diff=$((ts - now))
+    if [ "$diff" -lt 0 ]; then
+        diff=0
+    fi
+    h=$((diff / 3600))
+    m=$((diff / 60 % 60))
+    s=$((diff % 60))
+    local abs
+    abs=$(date -u -d @"$ts" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$ts")
+    printf "%dh %dm %ds (until %s)" "$h" "$m" "$s" "$abs"
+}
+
 # Function to validate downloader credentials expiry (must be defined before initialize_credentials)
 validate_downloader_credentials() {
     if [ ! -f "$CREDENTIALS_PATH" ]; then
@@ -469,23 +487,6 @@ iso_to_epoch() {
     local iso="$1"
     [ -z "$iso" ] && echo 0 && return
     date -d "$iso" +%s 2>/dev/null || echo 0
-}
-
-format_expiry() {
-    local ts="$1"
-    [ -z "$ts" ] || [ "$ts" -le 0 ] 2>/dev/null && echo "unknown" && return
-    local now diff h m s
-    now=$(date +%s)
-    diff=$((ts - now))
-    if [ "$diff" -lt 0 ]; then
-        diff=0
-    fi
-    h=$((diff / 3600))
-    m=$((diff / 60 % 60))
-    s=$((diff % 60))
-    local abs
-    abs=$(date -u -d @"$ts" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$ts")
-    printf "%dh %dm %ds (until %s)" "$h" "$m" "$s" "$abs"
 }
 
 load_auth_state() {
