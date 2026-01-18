@@ -228,7 +228,11 @@ if [ -f "$DOWNLOADER_BIN" ]; then
         if [ -f "$CREDENTIALS_PATH" ]; then
             msg GREEN "  ✓ Valid downloader auth file found"
             # Validate credentials and show expiry
-            validate_downloader_credentials || true
+            if ! validate_downloader_credentials; then
+                msg BLUE "  Regenerating expired credentials..."
+                rm -f "$CREDENTIALS_PATH"
+                initialize_credentials
+            fi
         fi
     else
         msg YELLOW "  Note: Downloader update check completed"
