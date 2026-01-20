@@ -352,55 +352,37 @@ else
 fi
 
 manage_psaver() {
-    cleanup_psaver_duplicates() {
-        local jars=()
-        # Sort reverse so versioned filenames keep the newest-looking one
-        mapfile -t jars < <(find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -type f \( -name "${PSAVER_JAR_NAME}*.jar" -o -name "${PSAVER_JAR_NAME}*.jar.disabled" \) 2>/dev/null | sort -r)
+    mkdir -p "$PSAVER_PLUGINS_DIR"
 
-        if [ "${#jars[@]}" -gt 1 ]; then
-            msg BLUE "[plugin] Removing duplicate Performance Saver files..."
-            for ((i = 1; i < ${#jars[@]}; i++)); do
-                msg YELLOW "  Removing duplicate $(basename "${jars[$i]}")"
-                rm -f "${jars[$i]}"
+    purge_psaver_duplicates() {
+        local kept=""
+
+        if compgen -G "$PSAVER_PLUGINS_DIR/${PSAVER_JAR_NAME}*.jar" >/dev/null; then
+            kept=$(ls -1t "$PSAVER_PLUGINS_DIR"/${PSAVER_JAR_NAME}*.jar 2>/dev/null | head -n1)
+            ls -1t "$PSAVER_PLUGINS_DIR"/${PSAVER_JAR_NAME}*.jar 2>/dev/null | tail -n +2 | while read -r jar; do
+                msg YELLOW "  Removing duplicate $(basename "$jar")"
+                rm -f "$jar"
             done
         fi
 
-        if [ "${#jars[@]}" -gt 0 ]; then
-            echo "${jars[0]}"
+        if compgen -G "$PSAVER_PLUGINS_DIR/${PSAVER_JAR_NAME}*.jar.disabled" >/dev/null; then
+            ls -1 "$PSAVER_PLUGINS_DIR"/${PSAVER_JAR_NAME}*.jar.disabled 2>/dev/null | while read -r jar; do
+                msg YELLOW "  Removing disabled copy $(basename "$jar")"
+                rm -f "$jar"
+            done
         fi
+
+        echo "$kept"
     }
 
-    purge_psaver_jars() {
-        local removed=0
-        while IFS= read -r -d '' jar; do
-            rm -f "$jar"
-            removed=1
-            msg YELLOW "  Removed old Performance Saver artifact $(basename "$jar")"
-        done < <(find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -type f \( -name "${PSAVER_JAR_NAME}*.jar" -o -name "${PSAVER_JAR_NAME}*.jar.disabled" \) -print0 2>/dev/null)
-
-        return $removed
-    }
-
-    mkdir -p "$PSAVER_PLUGINS_DIR"
-
-    # Always de-duplicate so updates don't leave multiple copies that trigger duplicate-plugin errors
-    EXISTING_JAR=$(cleanup_psaver_duplicates)
+    EXISTING_JAR=$(purge_psaver_duplicates)
 
     if [ "$PSAVER" = "1" ]; then
         msg BLUE "[plugin] Checking Performance Saver plugin..."
 
-        # If we still have an enabled jar after de-duplication, reuse it
+        # If we still have an enabled jar after cleanup, reuse it
         if [ -n "$EXISTING_JAR" ] && [ "${EXISTING_JAR##*.}" = "jar" ]; then
             msg GREEN "  ✓ Performance Saver already installed and enabled"
-            return 0
-        fi
-
-        DISABLED_JAR=$(find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -type f -name "${PSAVER_JAR_NAME}*.jar.disabled" 2>/dev/null | head -n 1)
-
-        if [ -n "$DISABLED_JAR" ]; then
-            msg BLUE "  Re-enabling Performance Saver..."
-            mv "$DISABLED_JAR" "${DISABLED_JAR%.disabled}"
-            msg GREEN "  ✓ Performance Saver re-enabled"
             return 0
         fi
 
@@ -431,8 +413,8 @@ manage_psaver() {
             return 1
         fi
 
-        # Remove stale versions before installing the freshly downloaded one to avoid duplicates on updates
-        purge_psaver_jars
+        # Remove all old versions before installing the freshly downloaded one
+        find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -type f \( -name "${PSAVER_JAR_NAME}*.jar" -o -name "${PSAVER_JAR_NAME}*.jar.disabled" \) -print0 2>/dev/null | xargs -0 -r rm -f
 
         if ! cp "$TEMP_PSAVER_DIR/$PLUGIN_FILENAME" "$PSAVER_PLUGINS_DIR/"; then
             msg RED "Error: Failed to install Performance Saver plugin (copy failed)"
@@ -452,9 +434,8 @@ manage_psaver() {
         fi
 
         # Ensure the plugin is gone when not requested (prevents leftovers after updates)
-        if purge_psaver_jars; then
-            msg GREEN "  ✓ Performance Saver removed from mods folder"
-        fi
+        find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -type f \( -name "${PSAVER_JAR_NAME}*.jar" -o -name "${PSAVER_JAR_NAME}*.jar.disabled" \) -print0 2>/dev/null | xargs -0 -r rm -f
+        msg GREEN "  ✓ Performance Saver removed from mods folder"
     fi
 }
 
