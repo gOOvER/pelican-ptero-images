@@ -1,2 +1,11 @@
 .DS_Store
 .idea
+
+# Hytale Server Files
+*.log
+.hytale-auth.json
+.hytale-downloader-credentials.json
+.version
+.tmp/
+install_error.log
+games/hytale/VARIABLES.md
