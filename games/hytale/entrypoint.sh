@@ -414,7 +414,13 @@ manage_psaver() {
         fi
 
         # Remove all old versions before installing the freshly downloaded one
-        find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -type f \( -name "${PSAVER_JAR_NAME}*.jar" -o -name "${PSAVER_JAR_NAME}*.jar.disabled" \) -print0 2>/dev/null | xargs -0 -r rm -f
+        msg BLUE "  Removing old plugin versions..."
+        for old_jar in "$PSAVER_PLUGINS_DIR"/${PSAVER_JAR_NAME}*.jar "$PSAVER_PLUGINS_DIR"/${PSAVER_JAR_NAME}*.jar.disabled; do
+            if [ -f "$old_jar" ]; then
+                msg YELLOW "  Deleting $(basename "$old_jar")"
+                rm -f "$old_jar"
+            fi
+        done
 
         if ! cp "$TEMP_PSAVER_DIR/$PLUGIN_FILENAME" "$PSAVER_PLUGINS_DIR/"; then
             msg RED "Error: Failed to install Performance Saver plugin (copy failed)"
@@ -434,7 +440,11 @@ manage_psaver() {
         fi
 
         # Ensure the plugin is gone when not requested (prevents leftovers after updates)
-        find "$PSAVER_PLUGINS_DIR" -maxdepth 1 -type f \( -name "${PSAVER_JAR_NAME}*.jar" -o -name "${PSAVER_JAR_NAME}*.jar.disabled" \) -print0 2>/dev/null | xargs -0 -r rm -f
+        for old_jar in "$PSAVER_PLUGINS_DIR"/${PSAVER_JAR_NAME}*.jar "$PSAVER_PLUGINS_DIR"/${PSAVER_JAR_NAME}*.jar.disabled; do
+            if [ -f "$old_jar" ]; then
+                rm -f "$old_jar"
+            fi
+        done
         msg GREEN "  ✓ Performance Saver removed from mods folder"
     fi
 }

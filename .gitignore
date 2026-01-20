@@ -9,3 +9,4 @@
 .tmp/
 install_error.log
 games/hytale/VARIABLES.md
+games/hytale/ENV_VARIABLES.md
