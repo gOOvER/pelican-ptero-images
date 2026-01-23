@@ -54,6 +54,7 @@ AUTO_UPDATE=${AUTO_UPDATE:-0}
 PATCHLINE=${PATCHLINE:-release}
 CREDENTIALS_PATH="${CREDENTIALS_PATH:-/home/container/.hytale-downloader-credentials.json}"
 DOWNLOADER_ARGS=()
+DOWNLOADER_ARGS+=("-credentials-path" "$CREDENTIALS_PATH")
 
 HYTALE_API_AUTH=${HYTALE_API_AUTH:-1}
 HYTALE_PROFILE_UUID=${HYTALE_PROFILE_UUID:-}
@@ -474,6 +475,25 @@ json_first_uuid() {
     sed -n 's/.*"uuid"[[:space:]]*:[[:space:]]*"\([0-9a-fA-F-]\+\)".*/\1/p' | head -n1
 }
 
+decode_base64url() {
+    # Convert base64url to standard base64 and decode
+    local b64=${1//-/+}
+    b64=${b64//_/\/}
+    local pad=$((4 - ${#b64} % 4))
+    if [ $pad -lt 4 ]; then
+        b64+=$(printf '=%.0s' $(seq 1 $pad))
+    fi
+    echo "$b64" | base64 -d 2>/dev/null
+}
+
+jwt_exp() {
+    local token="$1"
+    [ -z "$token" ] && return
+    local payload
+    payload=$(echo "$token" | cut -d'.' -f2)
+    decode_base64url "$payload" | jq -r '.exp // empty'
+}
+
 iso_to_epoch() {
     local iso="$1"
     [ -z "$iso" ] && echo 0 && return
@@ -652,6 +672,13 @@ create_game_session() {
         auth_log "INFO" "Game session created successfully"
         HYTALE_SESSION_EXPIRES=$(($(date +%s) + 3600))
     fi
+
+    # Use JWT exp claim if available to avoid stale expiry mismatches
+    local jwt_exp_val
+    jwt_exp_val=$(jwt_exp "$HYTALE_SESSION_TOKEN")
+    if [ -n "$jwt_exp_val" ]; then
+        HYTALE_SESSION_EXPIRES=$jwt_exp_val
+    fi
     return 0
 
 }
@@ -701,6 +728,13 @@ refresh_game_session() {
         msg GREEN "[auth] Game session refreshed"
         auth_log "INFO" "Game session refreshed successfully"
         HYTALE_SESSION_EXPIRES=$(($(date +%s) + 3600))
+    fi
+
+    # Sync expiry with JWT exp claim if present
+    local jwt_exp_val
+    jwt_exp_val=$(jwt_exp "$HYTALE_SESSION_TOKEN")
+    if [ -n "$jwt_exp_val" ]; then
+        HYTALE_SESSION_EXPIRES=$jwt_exp_val
     fi
     return 0
 }
@@ -773,6 +807,20 @@ run_hytale_api_auth() {
         msg RED "[auth] Session acquisition failed"
         auth_log "ERROR" "Session acquisition failed"
         return 1
+    fi
+
+    # Final safety: if session tokens are already near-expiry, refresh/create before export
+    local now
+    now=$(date +%s)
+    local jwt_exp_val
+    jwt_exp_val=$(jwt_exp "$HYTALE_SESSION_TOKEN")
+    if [ -n "$jwt_exp_val" ]; then
+        HYTALE_SESSION_EXPIRES=$jwt_exp_val
+    fi
+    if [ -n "$HYTALE_SESSION_EXPIRES" ] && [ $((HYTALE_SESSION_EXPIRES - HYTALE_TOKEN_EXPIRY_BUFFER)) -le "$now" ]; then
+        if ! refresh_game_session; then
+            create_game_session || return 1
+        fi
     fi
 
     export HYTALE_REFRESH_TOKEN
