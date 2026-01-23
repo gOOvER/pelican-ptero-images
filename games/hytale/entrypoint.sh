@@ -478,7 +478,7 @@ json_first_uuid() {
 decode_base64url() {
     # Convert base64url to standard base64 and decode
     local b64=${1//-/+}
-    b64=${b64//_/\/}
+    b64=${b64//_//}
     local pad=$((4 - ${#b64} % 4))
     if [ $pad -lt 4 ]; then
         b64+=$(printf '=%.0s' $(seq 1 $pad))
@@ -679,6 +679,14 @@ create_game_session() {
     if [ -n "$jwt_exp_val" ]; then
         HYTALE_SESSION_EXPIRES=$jwt_exp_val
     fi
+
+    # If still expired/near-expired, fail so caller can retry with fresh OAuth
+    local now
+    now=$(date +%s)
+    if [ -n "$HYTALE_SESSION_EXPIRES" ] && [ $((HYTALE_SESSION_EXPIRES - HYTALE_TOKEN_EXPIRY_BUFFER)) -le "$now" ]; then
+        msg RED "[auth] New game session appears expired; retrying with fresh OAuth"
+        return 1
+    fi
     return 0
 
 }
@@ -736,6 +744,13 @@ refresh_game_session() {
     if [ -n "$jwt_exp_val" ]; then
         HYTALE_SESSION_EXPIRES=$jwt_exp_val
     fi
+
+    local now
+    now=$(date +%s)
+    if [ -n "$HYTALE_SESSION_EXPIRES" ] && [ $((HYTALE_SESSION_EXPIRES - HYTALE_TOKEN_EXPIRY_BUFFER)) -le "$now" ]; then
+        msg RED "[auth] Refreshed session token is expired; need new session"
+        return 1
+    fi
     return 0
 }
 
@@ -767,15 +782,40 @@ ensure_session_tokens() {
     local now
     now=$(date +%s)
 
+    # If persisted session is clearly expired, drop it to force a new session
+    local persisted_exp="$HYTALE_SESSION_EXPIRES"
+    local jwt_exp_val
+    jwt_exp_val=$(jwt_exp "$HYTALE_SESSION_TOKEN")
+    if [ -n "$jwt_exp_val" ]; then
+        persisted_exp=$jwt_exp_val
+        HYTALE_SESSION_EXPIRES=$jwt_exp_val
+    fi
+    if [ -n "$persisted_exp" ] && [ "$persisted_exp" -gt 0 ] && [ $((persisted_exp - HYTALE_TOKEN_EXPIRY_BUFFER)) -le "$now" ]; then
+        auth_log "WARN" "Persisted session token expired; clearing cached session/identity tokens"
+        HYTALE_SESSION_TOKEN=""
+        HYTALE_IDENTITY_TOKEN=""
+        HYTALE_SESSION_EXPIRES=0
+    fi
+
     if [ -n "$HYTALE_SESSION_TOKEN" ] && [ -n "$HYTALE_SESSION_EXPIRES" ] && [ $((HYTALE_SESSION_EXPIRES - HYTALE_TOKEN_EXPIRY_BUFFER)) -gt "$now" ]; then
         return 0
     fi
 
     if [ -n "$HYTALE_SESSION_TOKEN" ] && [ $((HYTALE_SESSION_EXPIRES - HYTALE_TOKEN_EXPIRY_BUFFER)) -le "$now" ]; then
         if refresh_game_session; then
-            return 0
+            # Validate refreshed token expiry
+            local check_exp
+            check_exp=$(jwt_exp "$HYTALE_SESSION_TOKEN")
+            if [ -z "$check_exp" ]; then
+                check_exp=$HYTALE_SESSION_EXPIRES
+            else
+                HYTALE_SESSION_EXPIRES=$check_exp
+            fi
+            if [ -n "$check_exp" ] && [ $((check_exp - HYTALE_TOKEN_EXPIRY_BUFFER)) -gt "$now" ]; then
+                return 0
+            fi
         fi
-        msg YELLOW "[auth] Session refresh failed, creating new session"
+        msg YELLOW "[auth] Session refresh failed or still expired, creating new session"
     fi
 
     if ! fetch_profile_uuid; then
@@ -783,6 +823,20 @@ ensure_session_tokens() {
     fi
 
     if ! create_game_session; then
+        return 1
+    fi
+
+    # Final guard: ensure the new session is actually valid before returning
+    local final_exp="$HYTALE_SESSION_EXPIRES"
+    local final_jwt_exp
+    final_jwt_exp=$(jwt_exp "$HYTALE_SESSION_TOKEN")
+    if [ -n "$final_jwt_exp" ]; then
+        final_exp=$final_jwt_exp
+        HYTALE_SESSION_EXPIRES=$final_jwt_exp
+    fi
+    if [ -z "$final_exp" ] || [ "$final_exp" -le 0 ] || [ $((final_exp - HYTALE_TOKEN_EXPIRY_BUFFER)) -le "$now" ]; then
+        msg RED "[auth] New session token still expired; retrying later"
+        auth_log "ERROR" "Session token expired immediately after create"
         return 1
     fi
 
@@ -820,6 +874,19 @@ run_hytale_api_auth() {
     if [ -n "$HYTALE_SESSION_EXPIRES" ] && [ $((HYTALE_SESSION_EXPIRES - HYTALE_TOKEN_EXPIRY_BUFFER)) -le "$now" ]; then
         if ! refresh_game_session; then
             create_game_session || return 1
+        fi
+        # After refresh/create, re-evaluate; if still bad, fail fast
+        local final_guard_exp="$HYTALE_SESSION_EXPIRES"
+        local final_guard_jwt
+        final_guard_jwt=$(jwt_exp "$HYTALE_SESSION_TOKEN")
+        if [ -n "$final_guard_jwt" ]; then
+            final_guard_exp=$final_guard_jwt
+            HYTALE_SESSION_EXPIRES=$final_guard_jwt
+        fi
+        if [ -z "$final_guard_exp" ] || [ "$final_guard_exp" -le 0 ] || [ $((final_guard_exp - HYTALE_TOKEN_EXPIRY_BUFFER)) -le "$now" ]; then
+            msg RED "[auth] Session token still expired after refresh; aborting startup"
+            auth_log "ERROR" "Session token expired after final guard"
+            return 1
         fi
     fi
 
