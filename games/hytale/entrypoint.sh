@@ -183,8 +183,9 @@ validate_downloader_credentials() {
         auth_log "INFO" "Downloader credentials valid - expires at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
         return 0
     else
-        msg YELLOW "  ⚠ Credentials expired, will be regenerated on next use"
-        auth_log "WARN" "Downloader credentials expired at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at")"
+        msg YELLOW "  Downloader credentials expired; removing to force re-auth"
+        auth_log "WARN" "Downloader credentials expired at $(date -u -d @"$expires_at" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$expires_at") — deleting file to trigger new device flow"
+        rm -f "$CREDENTIALS_PATH" 2>/dev/null || true
         return 1
     fi
 }
@@ -704,6 +705,14 @@ refresh_game_session() {
     if [ -z "$resp" ]; then
         msg RED "[auth] Failed to refresh game session - empty response"
         auth_log "ERROR" "Failed to refresh game session - empty response"
+        return 1
+    fi
+
+    local api_error
+    api_error=$(printf '%s' "$resp" | json_field_string "error")
+    if [ -n "$api_error" ]; then
+        msg RED "[auth] Session refresh API error: $api_error"
+        auth_log "ERROR" "Session refresh failed with error: $api_error"
         return 1
     fi
 
