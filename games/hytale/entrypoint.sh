@@ -186,9 +186,12 @@ if [ -f "$DOWNLOADER_BIN" ]; then
     msg BLUE "[startup] Checking for downloader updates..."
 
     DOWNLOADER_CHECK_OUTPUT=$("$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -check-update 2>&1)
+    DOWNLOADER_CHECK_EXIT_CODE=$?
     echo "$DOWNLOADER_CHECK_OUTPUT" | sed "s/.*/  ${CYAN}&${NC}/"
 
-    if echo "$DOWNLOADER_CHECK_OUTPUT" | grep -q "A new version is available"; then
+    if [ $DOWNLOADER_CHECK_EXIT_CODE -ne 0 ]; then
+        msg YELLOW "[startup] Warning: Downloader check command failed with exit code $DOWNLOADER_CHECK_EXIT_CODE"
+    elif echo "$DOWNLOADER_CHECK_OUTPUT" | grep -q "A new version is available"; then
         msg YELLOW "[startup] Downloader update available, downloading..."
         if ! install_downloader; then
             msg RED "Error: Failed to update Hytale Downloader"
@@ -309,6 +312,15 @@ download_hytale() {
     else
         msg YELLOW "Warning: Assets.zip not found in downloaded files"
     fi
+
+    # Also copy launcher scripts from the zip root into the server directory
+    for script in "$DOWNLOAD_DIR"/*.sh "$DOWNLOAD_DIR"/*.cmd "$DOWNLOAD_DIR"/*.bat; do
+        if [ -f "$script" ]; then
+            cp "$script" /home/container/ || return 1
+            chmod +x "/home/container/$(basename "$script")" 2>/dev/null || true
+            msg GREEN "  ✓ Launcher script installed ($(basename "$script"))"
+        fi
+    done
 
     echo "$REMOTE_VERSION" > "/home/container/.version"
     rm -rf "$DOWNLOAD_DIR"
