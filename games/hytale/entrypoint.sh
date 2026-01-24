@@ -130,8 +130,8 @@ install_downloader() {
         return 1
     fi
 
-    if [ -f "$TEMP_DIR/hytale-downloader" ]; then
-        cp "$TEMP_DIR/hytale-downloader" "$DOWNLOADER_BIN"
+    if [ -f "$TEMP_DIR/hytale-downloader-linux-amd64" ]; then
+        cp "$TEMP_DIR/hytale-downloader-linux-amd64" "$DOWNLOADER_BIN"
         chmod +x "$DOWNLOADER_BIN"
         msg GREEN "✓ Hytale Downloader installed successfully"
     else
