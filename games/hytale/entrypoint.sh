@@ -157,7 +157,7 @@ format_expiry() {
     m=$((diff / 60 % 60))
     s=$((diff % 60))
     local abs
-    abs=$(date -u -d @"$ts" +"%Y-%m-%d %H:%M:%SZ" 2>/dev/null || echo "$ts")
+    abs=$(date -d @"$ts" +"%Y-%m-%d %H:%M:%S %Z" 2>/dev/null || echo "$ts")
     printf "%dh %dm %ds (until %s)" "$h" "$m" "$s" "$abs"
 }
 
