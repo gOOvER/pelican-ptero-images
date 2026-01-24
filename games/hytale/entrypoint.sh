@@ -210,14 +210,25 @@ msg  BLUE "Downloader Update Check"
 line "BLUE"
 if [ -f "$DOWNLOADER_BIN" ]; then
     msg BLUE "[startup] Checking for downloader updates..."
-    if "$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -check-update 2>&1 | sed "s/.*/  ${CYAN}&${NC}/"; then
-        if [ -f "$CREDENTIALS_PATH" ]; then
-            msg GREEN "  ✓ Valid downloader auth file found"
+
+    DOWNLOADER_CHECK_OUTPUT=$("$DOWNLOADER_BIN" "${DOWNLOADER_ARGS[@]}" -check-update 2>&1)
+    echo "$DOWNLOADER_CHECK_OUTPUT" | sed "s/.*/  ${CYAN}&${NC}/"
+
+    if echo "$DOWNLOADER_CHECK_OUTPUT" | grep -q "A new version is available"; then
+        msg YELLOW "[startup] Downloader update available, downloading..."
+        if ! install_downloader; then
+            msg RED "Error: Failed to update Hytale Downloader"
+        else
+            msg GREEN "✓ Hytale Downloader updated successfully"
         fi
-        validate_downloader_credentials || true
     else
-        msg YELLOW "  Note: Downloader update check completed"
+        msg GREEN "  ✓ Downloader is up to date"
     fi
+
+    if [ -f "$CREDENTIALS_PATH" ]; then
+        msg GREEN "  ✓ Valid downloader auth file found"
+    fi
+    validate_downloader_credentials || true
 fi
 
 check_for_updates() {
