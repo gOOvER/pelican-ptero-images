@@ -585,6 +585,8 @@ refresh_access_token() {
         -H "Content-Type: application/x-www-form-urlencoded" \
         -d "client_id=$HYTALE_OAUTH_CLIENT_ID" \
         -d "grant_type=refresh_token" \
+            local now_utc
+            now_utc=$(date -u +"%Y-%m-%d %H:%M:%SZ")
         -d "refresh_token=$HYTALE_REFRESH_TOKEN")
 
     local new_access
