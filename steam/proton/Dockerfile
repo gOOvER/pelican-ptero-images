@@ -15,7 +15,7 @@ SHELL ["/bin/bash", "-c"]
 # Set noninteractive frontend for apt
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Enable 32-bit architecture, update system, install packages and pipx/protontricks in one layer
+# Enable 32-bit architecture, update system, install packages in one layer
 RUN dpkg --add-architecture i386 && \
     apt-get update && apt-get -y upgrade && \
     apt-get install -y --no-install-recommends \
@@ -27,9 +27,8 @@ RUN dpkg --add-architecture i386 && \
     ffmpeg \
     file \
     git \
-    # gnupg2 \
-    # gnutls-bin \
     iproute2 \
+    jq \
     locales \
     numactl \
     mesa-utils \
@@ -39,13 +38,11 @@ RUN dpkg --add-architecture i386 && \
     pulseaudio \
     python3-full \
     python3-venv \
-	steam-devices \
+    steam-devices \
     tar \
     tini \
     wget \
     winbind \
-    xauth \
-    xvfb \
     lib32gcc-s1 \
     libao-common \
     libasound2 \
@@ -73,52 +70,33 @@ RUN dpkg --add-architecture i386 && \
     gstreamer1.0-alsa \
     gstreamer1.0-gl \
     gstreamer1.0-pulseaudio && \
-       # (protontricks removed) no pipx/protontricks installation in this image
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
 
 # Download and install Proton-GE latest release into /opt and register with Steam
 RUN set -eux; cd /tmp; \
-    # Determine Proton-GE latest tarball URL. Use a robust extraction that does
-    # not rely on cut with multi-character delimiter (which fails on some shells).
-    PROTON_JSON=""; \
-    # Fetch release JSON: prefer curl, fallback to wget; if neither is present, install curl
-    if command -v curl >/dev/null 2>&1; then \
-        PROTON_JSON=$(curl -sSf https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest || true); \
-    elif command -v wget >/dev/null 2>&1; then \
-        PROTON_JSON=$(wget -qO- https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest || true); \
-    else \
-        apt-get update && apt-get install -y --no-install-recommends curl && apt-get clean && rm -rf /var/lib/apt/lists/*; \
-        PROTON_JSON=$(curl -sSf https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest || true); \
+    # Fetch release JSON using curl (already installed in layer 1)
+    PROTON_JSON=$(curl -sSf https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest 2>&1) || { echo "Failed to fetch Proton-GE releases" >&2; exit 1; }; \
+    # Extract .tar.gz URL using jq (installed in layer 1)
+    PROTON_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[].browser_download_url' 2>/dev/null | grep '\.tar\.gz$' | head -n1) || { echo "Failed to parse Proton-GE release JSON" >&2; exit 1; }; \
+    [ -n "$PROTON_URL" ] || { echo "No Proton-GE .tar.gz found in latest release" >&2; exit 1; }; \
+    # Extract checksum URL
+    PROTON_CHECKSUM_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[].browser_download_url' 2>/dev/null | grep '\.sha512sum$' | head -n1) || true; \
+    # Download Proton-GE tarball
+    curl -sSL "$PROTON_URL" -o proton-ge.tar.gz || { echo "Failed to download Proton-GE from $PROTON_URL" >&2; exit 1; }; \
+    [ -s proton-ge.tar.gz ] || { echo "Downloaded Proton-GE archive is empty" >&2; exit 1; }; \
+    # Validate checksum if available
+    if [ -n "$PROTON_CHECKSUM_URL" ]; then \
+        curl -sSL "$PROTON_CHECKSUM_URL" -o proton-ge.sha512sum && \
+        sha512sum -c proton-ge.sha512sum || { echo "Proton-GE checksum validation failed" >&2; exit 1; }; \
     fi; \
-    PROTON_URL=""; \
-    if command -v jq >/dev/null 2>&1; then \
-        PROTON_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[].browser_download_url' 2>/dev/null | grep '\.tar\.gz$' | head -n1 || true); \
-    else \
-        # Fallback to grep + sed: find the first browser_download_url value
-        PROTON_URL=$(printf '%s' "$PROTON_JSON" | grep 'browser_download_url' || true); \
-        PROTON_URL=$(printf '%s' "$PROTON_URL" | sed -n 's/.*"browser_download_url": "\([^\"]*\.tar\.gz\)".*/\1/p' | head -n1 || true); \
-    fi; \
-    if [ -z "$PROTON_URL" ]; then echo "Could not determine Proton-GE URL" >&2; echo "Response snippet:"; printf '%s\n' "${PROTON_JSON:0:400}" >&2; exit 1; fi; \
-    # Download Proton-GE tarball using available downloader (curl preferred)
-    if command -v curl >/dev/null 2>&1; then \
-        curl -sSL "$PROTON_URL" -o proton-ge.tar.gz; \
-    elif command -v wget >/dev/null 2>&1; then \
-        wget -qO proton-ge.tar.gz "$PROTON_URL"; \
-    else \
-        apt-get update && apt-get install -y --no-install-recommends curl && apt-get clean && rm -rf /var/lib/apt/lists/*; \
-        curl -sSL "$PROTON_URL" -o proton-ge.tar.gz; \
-    fi; \
-    if [ ! -s proton-ge.tar.gz ]; then echo "Downloaded Proton-GE archive is empty" >&2; ls -l proton-ge.tar.gz || true; exit 1; fi; \
-    mkdir -p /opt; tar -xzf proton-ge.tar.gz -C /opt; \
-    # find extracted folder (GE-Proton*), normalize to /opt/ProtonGE
-    PROTON_DIR=$(find /opt -maxdepth 1 -type d -name 'GE-Proton*' -print -quit || true); \
-    if [ -n "$PROTON_DIR" ]; then mv "$PROTON_DIR" /opt/ProtonGE; fi; \
+    # Extract and normalize directory name
+    mkdir -p /opt && tar -xzf proton-ge.tar.gz -C /opt; \
+    PROTON_DIR=$(find /opt -maxdepth 1 -type d -name 'GE-Proton*' -print -quit); \
+    [ -n "$PROTON_DIR" ] && mv "$PROTON_DIR" /opt/ProtonGE || { echo "Failed to find extracted Proton-GE directory" >&2; exit 1; }; \
     # Register tool for Steam (compatibilitytools.d expects a folder)
-    if [ -d /opt/ProtonGE ]; then \
-        rm -rf /usr/local/share/steam/compatibilitytools.d/ProtonGE || true; \
-        mkdir -p /usr/local/share/steam/compatibilitytools.d; \
-        cp -a /opt/ProtonGE /usr/local/share/steam/compatibilitytools.d/ProtonGE; \
-    fi; \
+    rm -rf /usr/local/share/steam/compatibilitytools.d/ProtonGE 2>/dev/null || true; \
+    mkdir -p /usr/local/share/steam/compatibilitytools.d; \
+    cp -a /opt/ProtonGE /usr/local/share/steam/compatibilitytools.d/ProtonGE; \
     rm -rf /tmp/*
 
 # Proton machine-id fix
@@ -130,7 +108,8 @@ RUN rm -f /etc/machine-id /var/lib/dbus/machine-id && \
 RUN wget -q -O /usr/sbin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks && \
     chmod +x /usr/sbin/winetricks && \
     wget -q -O /usr/share/bash-completion/completions/winetricks \
-    https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks.bash-completion
+    https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks.bash-completion && \
+    rm -rf /tmp/*
 
 # Set locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
@@ -138,12 +117,13 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
-# -----------------------------
-# RCON CLI installation (latest release)
-# -----------------------------
+# RCON CLI installation (latest release) - uses jq for reliable parsing
 RUN set -eux; cd /tmp; \
-    RCON_LATEST=$(curl -sSf https://api.github.com/repos/gorcon/rcon-cli/releases/latest | grep "browser_download_url" | cut -d'\"' -f4 | grep amd64_linux | head -n1) || true; \
-    if [ -n "$RCON_LATEST" ]; then curl -sSL "$RCON_LATEST" -o rcon.tar.gz; tar xvf rcon.tar.gz; mv rcon-*-amd64_linux/rcon /usr/local/bin/ || true; chmod +x /usr/local/bin/rcon || true; fi; \
+    RCON_LATEST=$(curl -sSf https://api.github.com/repos/gorcon/rcon-cli/releases/latest 2>&1 | jq -r '.assets[] | select(.name | contains("amd64_linux")) | .browser_download_url' | head -n1) || true; \
+    if [ -n "$RCON_LATEST" ]; then \
+        curl -sSL "$RCON_LATEST" -o rcon.tar.gz && tar -xzf rcon.tar.gz && \
+        mv rcon-*-amd64_linux/rcon /usr/local/bin/ 2>/dev/null && chmod +x /usr/local/bin/rcon || true; \
+    fi; \
     rm -rf /tmp/*
 
 # Provide a simple system-wide `proton` wrapper that launches the installed

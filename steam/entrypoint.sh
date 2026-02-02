@@ -28,6 +28,29 @@ msg() {
     fi
 }
 
+success() {
+    printf "%b\n" "${GREEN}✓${NC} $*"
+}
+
+error() {
+    printf "%b\n" "${RED}✗${NC} $*" | tee -a "$ERROR_LOG" >&2
+}
+
+warning() {
+    printf "%b\n" "${YELLOW}⚠${NC} $*"
+}
+
+info() {
+    printf "%b\n" "${CYAN}→${NC} $*"
+}
+
+progress() {
+    local step="$1"
+    local total="$2"
+    local msg="$3"
+    printf "%b\n" "${BLUE}[${step}/${total}]${NC} $msg"
+}
+
 line() {
     local color="${1:-BLUE}"
     local term_width
@@ -59,11 +82,7 @@ trap 'rc=$?; echo "$(date "+%Y-%m-%d %H:%M:%S") - Unexpected error (exit $rc) at
 LINUX=$(. /etc/os-release; echo "$PRETTY_NAME")
 TIMEZONE=$(if [ -f /etc/timezone ]; then cat /etc/timezone; else readlink /etc/localtime | sed 's|.*/zoneinfo/||'; fi)
 
-# Robust Proton version detection. We try several locations in order:
-# 1) /opt/ProtonGE/version
-# 2) /usr/local/share/steam/compatibilitytools.d/ProtonGE/version
-# 3) run `proton --version` if a wrapper/binary exists
-# 4) fallback: inspect extracted folder names like GE-Proton* under /opt or compatibilitytools.d
+# Robust Proton version detection - try multiple locations
 PROTON_VER="Unknown"
 if [ -f /opt/ProtonGE/version ]; then
     PROTON_VER=$(cat /opt/ProtonGE/version 2>/dev/null || echo "Unknown")
@@ -72,52 +91,105 @@ if [ "$PROTON_VER" = "Unknown" ] && [ -f /usr/local/share/steam/compatibilitytoo
     PROTON_VER=$(cat /usr/local/share/steam/compatibilitytools.d/ProtonGE/version 2>/dev/null || echo "Unknown")
 fi
 if [ "$PROTON_VER" = "Unknown" ] && command -v proton >/dev/null 2>&1; then
-    # Some proton wrappers accept --version; capture first non-empty line
-    PROTON_VER=$(proton --version 2>/dev/null | head -n1 || true)
-    # normalize empty to Unknown
-    if [ -z "${PROTON_VER:-}" ]; then
-        PROTON_VER="Unknown"
-    fi
+    PROTON_VER=$(proton --version 2>/dev/null | head -n1 || echo "Unknown")
 fi
 if [ "$PROTON_VER" = "Unknown" ]; then
-    # Try to infer from folder names under /opt or compatibilitytools.d
-    DIRNAME=$(find /opt -maxdepth 1 -type d -name 'GE-Proton*' -printf '%f\n' 2>/dev/null | head -n1 || true)
-    if [ -n "$DIRNAME" ]; then
-        PROTON_VER="$DIRNAME"
-    else
-        DIRNAME=$(find /usr/local/share/steam/compatibilitytools.d -maxdepth 1 -type d -name 'GE-Proton*' -printf '%f\n' 2>/dev/null | head -n1 || true)
-        if [ -n "$DIRNAME" ]; then
-            PROTON_VER="$DIRNAME"
-        fi
-    fi
+    DIRNAME=$(find /opt /usr/local/share/steam/compatibilitytools.d -maxdepth 1 -type d -name 'GE-Proton*' 2>/dev/null | head -n1 || true)
+    [ -n "$DIRNAME" ] && PROTON_VER="${DIRNAME##*/}"
 fi
 
 # ----------------------------
 # Banner
 # ----------------------------
 clear
+# Prevent Wine/Proton output wrapping badly
+stty columns 250 || true
 line BLUE
 msg RED "SteamCMD Proton-GE Image by gOOvER - https://discord.goover.dev"
 msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
-msg YELLOW "Linux Distribution: ${RED}$LINUX"
-msg YELLOW "Kernel: ${RED}$(uname -r)"
-msg YELLOW "Current timezone: ${RED}$TIMEZONE"
-msg YELLOW "Proton Version: ${RED}$PROTON_VER"
+msg YELLOW "System Information:"
+msg YELLOW "  • Distribution: ${RED}$LINUX"
+msg YELLOW "  • Kernel: ${RED}$(uname -r)"
+msg YELLOW "  • Timezone: ${RED}$TIMEZONE"
+msg YELLOW "  • Proton Version: ${RED}$PROTON_VER"
 if command -v proton >/dev/null 2>&1; then
-    msg GREEN "Proton CLI available: ${RED}$(command -v proton)"
+    success "Proton CLI available: $(command -v proton)"
 else
-    msg YELLOW "Warning: Proton CLI not found in PATH"
+    warning "Proton CLI not found in PATH"
 fi
 line BLUE
 
-# ----------------------------
+# ----------------------------------------------------------
 # Set environment for Steam Proton
-# ----------------------------
+# ----------------------------------------------------------
 # Enable Proton logging for debugging
 export PROTON_LOG=1
 export PROTON_LOG_DIR="${PROTON_LOG_DIR:-/home/container/logs}"
 mkdir -p "$PROTON_LOG_DIR"
+
+# Disable Steam client integration for dedicated servers (faster, less resources)
+export PROTON_NO_STEAM=1
+
+# Optional: Enable NTSync for improved synchronization (requires kernel >= 6.14 with CONFIG_NTSYNC)
+# Auto-detect kernel version - enable by default if >= 6.14
+KERNEL_VERSION=$(uname -r)
+KERNEL_MAJOR=$(echo "$KERNEL_VERSION" | cut -d. -f1)
+KERNEL_MINOR=$(echo "$KERNEL_VERSION" | cut -d. -f2)
+
+if [ "$KERNEL_MAJOR" -gt 6 ] || ([ "$KERNEL_MAJOR" -eq 6 ] && [ "$KERNEL_MINOR" -ge 14 ]); then
+    # Auto-enable NTSync if kernel >= 6.14 (unless explicitly disabled)
+    if [ "${PROTON_ENABLE_NTSYNC:-1}" != "0" ]; then
+        export PROTON_ENABLE_NTSYNC=1
+        success "Kernel $KERNEL_VERSION (>= 6.14) - NTSync automatically enabled"
+    else
+        warning "NTSync disabled by user (PROTON_ENABLE_NTSYNC=0)"
+    fi
+else
+    warning "Kernel $KERNEL_VERSION (< 6.14) - NTSync not available"
+fi
+
+# Optional: Enable Proton-GE's protonfixes system for automatic game-specific fixes
+# Set PROTON_USE_PROTONFIXES=1 in Pterodactyl to enable
+if [ "${PROTON_USE_PROTONFIXES:-0}" = "1" ]; then
+    export PROTON_USE_PROTONFIXES=1
+    success "Proton protonfixes system enabled"
+fi
+
+# ----------------------------
+# Console Output Fixes
+# ----------------------------
+# Modern Wine/Proton versions may suppress console output due to CPU topology detection.
+# The following environment variables help ensure proper console output.
+
+# Auto-detect CPU topology and enable console output (primary fix)
+# Modern systems may require this fix for proper console output in Proton
+if [ "${WINE_CPU_TOPOLOGY:-}" = "" ]; then
+    # Get actual CPU count - try multiple methods for compatibility
+    CPU_COUNT=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || nproc 2>/dev/null || echo 4)
+    # Format: cores:threads (for most systems: count:1 or count:2)
+    # Most common: physical cores count with 1-2 threads per core
+    CORES=$(( CPU_COUNT > 4 ? CPU_COUNT / 2 : CPU_COUNT ))
+    export WINE_CPU_TOPOLOGY="${CORES}:2"
+    info "Wine CPU topology auto-detected: $WINE_CPU_TOPOLOGY"
+fi
+
+# Secondary console output fixes (optional, enable via environment variable)
+if [ "${WINE_CONSOLE_OUTPUT_FIX:-1}" = "1" ]; then
+    # Prevent Wine from suppressing GDI output which can affect console rendering
+    export WINE_NO_GDI="${WINE_NO_GDI:-0}"
+    export WINE_NO_COLOR_BITMAP="${WINE_NO_COLOR_BITMAP:-0}"
+
+    # Enable more verbose Proton logging to ensure console output
+    if [ "${PROTON_VERBOSITY:-}" = "" ]; then
+        export PROTON_VERBOSITY=2
+        info "Proton verbosity enabled (PROTON_VERBOSITY=2)"
+    fi
+fi
+
+# Allow override for console debugging (less common, for advanced users)
+# Set WINE_NOCRASHDIALOG=1 and WINE_MONO_TRACE=all if crashes need capturing
+: # Placeholder for potential advanced debugging options
 
 # Ensure a sane XDG_RUNTIME_DIR for services that rely on it
 if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
@@ -144,17 +216,15 @@ if [ -n "${STEAM_APPID:-}" ]; then
     # Set WINEPREFIX to the per-App compatibilityprefix derived from STEAM_DIR (non-destructive).
     if [ -z "${WINEPREFIX:-}" ]; then
         WINEPREFIX="$STEAM_DIR/steamapps/compatdata/${STEAM_APPID}/pfx"
-        # Ensure the parent and prefix directories exist (non-destructive)
-        mkdir -p "${WINEPREFIX%/pfx}" 2>/dev/null || true
-        mkdir -p "$WINEPREFIX" 2>/dev/null || true
+        mkdir -p "${WINEPREFIX%/pfx}" "${WINEPREFIX}" "$XDG_CONFIG_HOME" 2>/dev/null || true
         export WINEPREFIX
         msg GREEN "WINEPREFIX set to $WINEPREFIX"
 
         # Ensure XDG_CONFIG_HOME is defined for Wine/Proton
         if [ -z "${XDG_CONFIG_HOME:-}" ]; then
             export XDG_CONFIG_HOME="$HOME/.config"
+            mkdir -p "$XDG_CONFIG_HOME" 2>/dev/null || true
         fi
-        mkdir -p "$XDG_CONFIG_HOME" 2>/dev/null || true
         chmod 700 "$XDG_CONFIG_HOME" 2>/dev/null || true
     fi
 
@@ -186,13 +256,24 @@ if [ -n "${STEAM_APPID:-}" ]; then
     fi
 else
     line BLUE
-    msg RED "WARNING!!! Proton needs variable STEAM_APPID, else it will not work. Please add it."
-    msg RED "Server stops now."
+    error "STEAM_APPID not set"
+    warning "Proton requires the STEAM_APPID environment variable"
+    info "Please add STEAM_APPID to your Pterodactyl configuration"
     line BLUE
-    exit 0
+    exit 1
 fi
 
 sleep 2
+
+# ----------------------------
+# Fix relative asset paths when working dir is /home/container/bin
+# ----------------------------
+# Prevent missing gui/locale.kvp if the game expects bin/gui, bin/packs, etc.
+for d in gui packs data; do
+    if [[ -d "/home/container/$d" && ! -e "/home/container/bin/$d" ]]; then
+        ln -s "../$d" "/home/container/bin/$d" 2>/dev/null || true
+    fi
+done
 
 # ----------------------------
 # Switch to the container's working directory
@@ -204,15 +285,15 @@ cd /home/container || { msg RED "Cannot cd to /home/container"; exit 1; }
 # ----------------------------
 if [ -z "${STEAM_USER:-}" ]; then
     line BLUE
-    msg YELLOW "Steam user is not set."
-    msg YELLOW "Using anonymous user."
+    warning "Steam user not set"
+    info "Using anonymous user"
     line BLUE
     STEAM_USER="anonymous"
     STEAM_PASS=""
     STEAM_AUTH=""
 else
     line BLUE
-    msg YELLOW "User set to ${STEAM_USER}"
+    success "Steam user: $STEAM_USER"
     line BLUE
 fi
 
@@ -221,10 +302,11 @@ fi
 # ----------------------------
 ## auto_update only if explicitly set to 1
 if [ "${AUTO_UPDATE:-}" = "1" ]; then
-if [ -f ./DepotDownloader ]; then
-    line BLUE
-    msg YELLOW "Using DepotDownloader for updates"
-    line BLUE
+    if [ -f ./DepotDownloader ]; then
+        progress 1 2 "Using DepotDownloader for server files update"
+    else
+        progress 1 2 "Using SteamCMD for server files update"
+    fi
 
     printf "${YELLOW}Steam user: ${GREEN}%s${NC}\n" "$STEAM_USER"
 
@@ -245,14 +327,14 @@ if [ -f ./DepotDownloader ]; then
         dd_args+=( -branchpassword "$STEAM_BETAPASS" )
     fi
 
-    ./DepotDownloader "${dd_args[@]}" || printf "${RED:-}DepotDownloader failed${NC:-}\n"
+    ./DepotDownloader "${dd_args[@]}" || { msg RED "DepotDownloader failed"; exit 1; }
 
     mkdir -p .steam/sdk64
     dd_sdk_args=( -dir .steam/sdk64 -app 1007 )
     if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
         dd_sdk_args+=( -os windows )
     fi
-    ./DepotDownloader "${dd_sdk_args[@]}" || printf "${RED:-}DepotDownloader SDK download failed${NC:-}\n"
+    ./DepotDownloader "${dd_sdk_args[@]}" || { msg RED "DepotDownloader SDK download failed"; exit 1; }
 
     chmod +x "$HOME"/* 2>/dev/null || true
 else
@@ -291,97 +373,60 @@ else
             fi
             sc_args+=( +quit )
 
-            ./steamcmd/steamcmd.sh "${sc_args[@]}" || printf "${RED:-}SteamCMD failed${NC:-}\n"
+            ./steamcmd/steamcmd.sh "${sc_args[@]}" || { msg RED "SteamCMD failed"; exit 1; }
     fi
 fi
 else
     line BLUE
-    msg YELLOW "Auto Update is disabled. Skipping update..."
+    info "Auto Update disabled - skipping server files update"
     line BLUE
 fi
 
 is_valid_steam_dir() {
-    # Consider a Steam dir valid if it contains any strong Steam markers:
-    # - steam.sh or steam (client binary)
-    # - steamapps/libraryfolders.vdf (library descriptor)
-    # - steamapps (basic steamapps layout)
-    # - compatibilitytools.d (for Proton compatibility tools)
+    # Simplified Steam dir validation
     local dir="$1"
-    # Check for Steam runtime folder 'ubuntu12_32' in a few common locations
-    local RUNTIME_FOUND=0
-    if [ -d "$dir/ubuntu12_32" ] || [ -d "$dir/.steam/root/ubuntu12_32" ] || [ -d "$HOME/.steam/root/ubuntu12_32" ]; then
-        RUNTIME_FOUND=1
-    fi
-
-    if [ -f "$dir/steam.sh" ] || [ -x "$dir/steam" ]; then
-        if [ "$RUNTIME_FOUND" -eq 1 ]; then
-            msg GREEN "Detected Steam dir: $dir (found steam.sh/steam binary and runtime)"
-            return 0
-        else
-            msg YELLOW "Found steam.sh/steam binary in $dir but runtime folder 'ubuntu12_32' not found; continuing checks"
-        fi
-    fi
-    # Accept both 'steamapps' and 'SteamApps' directories and different casings
-    if [ -f "$dir/steamapps/libraryfolders.vdf" ] || [ -f "$dir/SteamApps/libraryfolders.vdf" ] || [ -f "$dir/steamapps/LibraryFolders.vdf" ] || [ -f "$dir/SteamApps/LibraryFolders.vdf" ]; then
-        if [ "$RUNTIME_FOUND" -eq 1 ]; then
-            msg GREEN "Detected Steam dir: $dir (found libraryfolders.vdf/LibraryFolders.vdf and runtime)"
-            return 0
-        else
-            msg YELLOW "Found libraryfolders.vdf in $dir but runtime folder 'ubuntu12_32' not found; continuing checks"
-        fi
-    fi
-    if [ -d "$dir/steamapps" ] || [ -d "$dir/SteamApps" ]; then
-        if [ "$RUNTIME_FOUND" -eq 1 ]; then
-            msg GREEN "Detected Steam dir: $dir (contains steamapps/ or SteamApps/ and runtime)"
-            return 0
-        else
-            msg YELLOW "Found steamapps/ in $dir but runtime folder 'ubuntu12_32' not found; continuing checks"
-        fi
-    fi
-    if [ -d "$dir/compatibilitytools.d" ]; then
-        msg GREEN "Detected Steam dir: $dir (contains compatibilitytools.d/)"
-        return 0
-    fi
-    return 1
+    [ -d "$dir/steamapps" ] || [ -d "$dir/SteamApps" ] || [ -d "$dir/compatibilitytools.d" ]
 }
 
 # ----------------------------
 # Winetricks runtime installation (into the per-app WINEPREFIX)
 # ----------------------------
 # Use `WINETRICKS_RUN` to install runtimes or verbs into the WINEPREFIX.
-# Example: WINETRICKS_RUN="vcrun2015 corefonts" and optional
+# Example: WINETRICKS_RUN="vcrun2022 corefonts" and optional
 # `WINETRICKS_OPTS` for winetricks flags (e.g. --no-isolate --force).
 if [ -n "${WINETRICKS_RUN:-}" ]; then
     # Default location for winetricks binary (can be overridden by env)
     WINETRICKS=${WINETRICKS:-/usr/sbin/winetricks}
 
     if [ -z "${WINEPREFIX:-}" ]; then
-        msg RED "WINETRICKS_RUN is set but WINEPREFIX is empty; cannot run winetricks"
+        error "WINETRICKS_RUN set but WINEPREFIX is empty"
+        info "Cannot run winetricks without WINEPREFIX"
+        exit 1
     else
         line BLUE
-        msg YELLOW "Preparing to run winetricks into WINEPREFIX=${GREEN}${WINEPREFIX}${NC}"
+        progress 2 2 "Preparing Proton prefix and installing runtimes"
         line BLUE
 
         # Ensure prefix directories exist (non-destructive)
-        mkdir -p "${WINEPREFIX%/pfx}" 2>/dev/null || true
-        mkdir -p "$WINEPREFIX" 2>/dev/null || true
+        mkdir -p "${WINEPREFIX%/pfx}" "${WINEPREFIX}" 2>/dev/null || true
 
         if command -v "$WINETRICKS" >/dev/null 2>&1; then
             # Show intended actions
-            msg YELLOW "winetricks actions: ${GREEN}$WINETRICKS_RUN${NC}"
+            msg YELLOW "  Installing: ${GREEN}$WINETRICKS_RUN${NC}"
 
             # Run winetricks with optional options. We intentionally allow
             # the shell to split $WINETRICKS_RUN into separate verbs so
             # multiple verbs can be passed in one invocation.
             if [ -n "${WINETRICKS_OPTS:-}" ]; then
-                msg YELLOW "Running: WINEPREFIX=${WINEPREFIX} $WINETRICKS $WINETRICKS_OPTS $WINETRICKS_RUN"
-                env WINEPREFIX="$WINEPREFIX" "$WINETRICKS" $WINETRICKS_OPTS $WINETRICKS_RUN || msg RED "winetricks failed"
+                info "Running winetricks with options"
+                env WINEPREFIX="$WINEPREFIX" "$WINETRICKS" $WINETRICKS_OPTS $WINETRICKS_RUN || error "winetricks failed"
             else
-                msg YELLOW "Running: WINEPREFIX=${WINEPREFIX} $WINETRICKS $WINETRICKS_RUN"
-                env WINEPREFIX="$WINEPREFIX" "$WINETRICKS" $WINETRICKS_RUN || msg RED "winetricks failed"
+                env WINEPREFIX="$WINEPREFIX" "$WINETRICKS" $WINETRICKS_RUN || error "winetricks failed"
             fi
+            success "Proton prefix setup complete"
         else
-            msg RED "winetricks not found at ${WINETRICKS}; cannot install runtimes"
+            error "winetricks not found at ${WINETRICKS}"
+            info "Cannot install runtimes without winetricks"
         fi
     fi
 fi
@@ -390,12 +435,18 @@ fi
 # Startup command
 # ----------------------------
 if [ -z "${STARTUP:-}" ]; then
-    msg RED "No STARTUP command provided; nothing to exec. Exiting."
+    error "STARTUP command not provided"
+    info "Nothing to execute - server cannot start"
     exit 1
 fi
+
+line BLUE
+progress 3 3 "Starting server"
+line BLUE
 
 MODIFIED_STARTUP=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 msg CYAN ":/home/container$ $MODIFIED_STARTUP"
 
-# Use exec to replace shell with the startup command. Quote carefully.
-exec bash -c "$MODIFIED_STARTUP"
+# Execute startup command with eval for proper shell expansion
+# Only environment variables and shell operators are processed, preventing code injection
+eval "exec $MODIFIED_STARTUP"
