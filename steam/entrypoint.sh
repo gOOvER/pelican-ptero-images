@@ -155,6 +155,12 @@ fi
 # Set PROTON_USE_PROTONFIXES=0 in your container configuration to disable
 if [ "${PROTON_USE_PROTONFIXES:-1}" != "0" ]; then
     export PROTON_USE_PROTONFIXES=1
+
+    # Protonfixes requires a home directory for its script cache and configuration
+    export PROTONHOMEDIR="${PROTONHOMEDIR:-/home/container/.proton}"
+    mkdir -p "$PROTONHOMEDIR"
+    mkdir -p "$PROTONHOMEDIR/protonfixes"
+
     success "Proton protonfixes system enabled"
 fi
 
