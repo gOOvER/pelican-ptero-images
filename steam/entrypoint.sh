@@ -151,9 +151,9 @@ else
     warning "Kernel $KERNEL_VERSION (< 6.14) - NTSync not available"
 fi
 
-# Optional: Enable Proton-GE's protonfixes system for automatic game-specific fixes
-# Set PROTON_USE_PROTONFIXES=1 in Pterodactyl to enable
-if [ "${PROTON_USE_PROTONFIXES:-0}" = "1" ]; then
+# Enable Proton-GE's protonfixes system for automatic game-specific fixes (enabled by default)
+# Set PROTON_USE_PROTONFIXES=0 in your container configuration to disable
+if [ "${PROTON_USE_PROTONFIXES:-1}" != "0" ]; then
     export PROTON_USE_PROTONFIXES=1
     success "Proton protonfixes system enabled"
 fi
@@ -261,7 +261,7 @@ else
     line BLUE
     error "STEAM_APPID not set"
     warning "Proton requires the STEAM_APPID environment variable"
-    info "Please add STEAM_APPID to your Pterodactyl configuration"
+    info "Please add STEAM_APPID to your server configuration (Pelican Panel, Pterodactyl, etc.)"
     line BLUE
     exit 1
 fi
