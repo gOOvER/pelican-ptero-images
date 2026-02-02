@@ -87,8 +87,10 @@ RUN set -eux; cd /tmp; \
     # Validate checksum if available
     if [ -n "$PROTON_CHECKSUM_URL" ]; then \
         curl -sSL "$PROTON_CHECKSUM_URL" -o proton-ge.sha512sum && \
-        sed -i "s/GE-Proton[0-9.]*\.tar\.gz/proton-ge.tar.gz/g" proton-ge.sha512sum && \
-        sha512sum -c proton-ge.sha512sum || { echo "Proton-GE checksum validation failed" >&2; exit 1; }; \
+        EXPECTED_HASH=$(awk '{print $1}' proton-ge.sha512sum | head -n1) && \
+        [ -n "$EXPECTED_HASH" ] || { echo "Failed to extract hash from checksum file" >&2; exit 1; }; \
+        ACTUAL_HASH=$(sha512sum proton-ge.tar.gz | awk '{print $1}') && \
+        [ "$EXPECTED_HASH" = "$ACTUAL_HASH" ] || { echo "Proton-GE checksum validation failed: expected $EXPECTED_HASH but got $ACTUAL_HASH" >&2; exit 1; }; \
     fi; \
     # Extract and normalize directory name
     mkdir -p /opt && tar -xzf proton-ge.tar.gz -C /opt; \
