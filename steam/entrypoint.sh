@@ -442,6 +442,49 @@ line BLUE
 MODIFIED_STARTUP=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 msg CYAN ":/home/container$ $MODIFIED_STARTUP"
 
+# Function to find and stream game logs if they exist
+stream_game_logs() {
+    local log_search_paths=(
+        "${WINEPREFIX}/drive_c/users/container/AppData/Local/*/Saved/Logs/"
+        "${WINEPREFIX}/drive_c/users/container/AppData/LocalLow/*/Logs/"
+        "$HOME/*/Saved/Logs/"
+        "$HOME/.local/share/*/Saved/Logs/"
+    )
+
+    for log_path in "${log_search_paths[@]}"; do
+        # Expand glob patterns
+        for found_log_dir in $log_path; do
+            if [ -d "$found_log_dir" ]; then
+                # Find most recent log file
+                latest_log=$(find "$found_log_dir" -type f -name "*.log" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)
+                if [ -n "$latest_log" ]; then
+                    info "Streaming game log: $latest_log"
+                    tail -c0 -F "$latest_log" --pid=$SERVER_PID 2>/dev/null || true
+                    return 0
+                fi
+            fi
+        done
+    done
+}
+
 # Execute startup command with eval for proper shell expansion
 # Only environment variables and shell operators are processed, preventing code injection
-eval "exec $MODIFIED_STARTUP"
+eval "$MODIFIED_STARTUP" &
+SERVER_PID=$!
+
+# Stream logs in parallel if game writes to log files
+if [ "${STREAM_LOGS:-1}" != "0" ]; then
+    stream_game_logs &
+    LOG_PID=$!
+fi
+
+# Wait for server process
+wait $SERVER_PID
+SERVER_EXIT=$?
+
+# Cleanup log streaming if active
+if [ -n "${LOG_PID:-}" ]; then
+    kill $LOG_PID 2>/dev/null || true
+fi
+
+exit $SERVER_EXIT
