@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 ERROR_LOG="install_error.log"
 : > "$ERROR_LOG"
@@ -26,6 +26,29 @@ msg() {
     else
         printf "%b\n" "${!color}$*${NC}"
     fi
+}
+
+success() {
+    printf "%b\n" "${GREEN}✓${NC} $*"
+}
+
+error() {
+    printf "%b\n" "${RED}✗${NC} $*" | tee -a "$ERROR_LOG" >&2
+}
+
+warning() {
+    printf "%b\n" "${YELLOW}⚠${NC} $*"
+}
+
+info() {
+    printf "%b\n" "${CYAN}→${NC} $*"
+}
+
+progress() {
+    local step="$1"
+    local total="$2"
+    local msg="$3"
+    printf "%b\n" "${BLUE}[${step}/${total}]${NC} $msg"
 }
 
 # Rotate/compress large logs to avoid unbounded growth
@@ -91,6 +114,8 @@ line() {
     local color="${1:-BLUE}"
     local term_width
     term_width=$(tput cols 2>/dev/null || echo 70)
+    # Cap line width at 120 characters for readability
+    [ "$term_width" -gt 120 ] && term_width=120
     local sep
     sep=$(printf '%*s' "$term_width" '' | tr ' ' '-')
 
@@ -107,8 +132,11 @@ line() {
 
 # ----------------------------
 # Error trap for uncaught errors
+# Print timestamp, failing command and line number
 # ----------------------------
-trap 'echo "$(date +%Y-%m-%d\ %H:%M:%S) - Unexpected error at line $LINENO" | tee -a "$ERROR_LOG" >&2' ERR
+# initialize rc so static checkers do not warn about unassigned var
+rc=0
+trap 'rc=$?; echo "$(date "+%Y-%m-%d %H:%M:%S") - Unexpected error (exit $rc) at line $LINENO: \"${BASH_COMMAND}\"" | tee -a "$ERROR_LOG" >&2; exit $rc' ERR
 
 # ----------------------------
 # System Info
@@ -122,12 +150,13 @@ WINE_VER=$(wine --version 2>/dev/null || echo "Wine not found!")
 # ----------------------------
 clear
 line BLUE
-msg YELLOW "Wine Image from gOOvER"
+msg RED "Wine Image by gOOvER - https://discord.goover.dev"
 msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
-msg YELLOW "Docker Linux Distribution: ${RED}$LINUX"
-msg YELLOW "Current timezone: ${RED}$TIMEZONE"
-msg YELLOW "Wine Version: ${RED}$WINE_VER"
+msg YELLOW "System Information:"
+msg YELLOW "  • Distribution: ${RED}$LINUX"
+msg YELLOW "  • Timezone: ${RED}$TIMEZONE"
+msg YELLOW "  • Wine Version: ${RED}$WINE_VER"
 line BLUE
 
 # ----------------------------
@@ -169,9 +198,13 @@ done
 cd /home/container || { msg RED "Failed to change directory to /home/container."; exit 1; }
 
 # ----------------------------
+# Create log directories early
+# ----------------------------
+mkdir -p "$WINEPREFIX/logs" "$XDG_RUNTIME_DIR"
+
+# ----------------------------
 # Xvfb (always enabled)
 # ----------------------------
-mkdir -p "$WINEPREFIX/logs"
 XVFB_LOG="$WINEPREFIX/logs/xvfb.log"
 # If an X server is already available on $DISPLAY, don't start a new one
 if ! xdpyinfo -display "$DISPLAY" &>/dev/null; then
@@ -205,8 +238,6 @@ fi
 line BLUE
 msg YELLOW "Importing system root CA certificates into Wine (this may take a few minutes)"
 line BLUE
-
-mkdir -p "$WINEPREFIX/logs"
 CERT_LOG="$WINEPREFIX/logs/certs_import.log"
 rotate_log "$CERT_LOG" 5242880 3 || true
 
@@ -240,7 +271,7 @@ else
         msg YELLOW "Splitting PEM bundle into individual cert files (robust split)..."
         awk 'BEGIN{n=0} /-----BEGIN CERTIFICATE-----/{n++; fname=sprintf("cert%04d.pem",n)} {print > fname}' cacert.pem 2>>"$CERT_LOG" || true
         find . -maxdepth 1 -type f -name 'cert*.pem' -size 0 -delete
-
+        progress 1 2 "Converting and importing certificates..."
         msg YELLOW "Converting valid PEM files to DER (.cer) and importing into Wine's root store..."
         for pem in cert*.pem; do
             [ -f "$pem" ] || continue
@@ -252,6 +283,7 @@ else
                 wine rundll32.exe cryptext.dll,CryptExtAddCer "$(pwd)/$cer" >>"$CERT_LOG" 2>&1 || true
             fi
         done
+        progress 2 2 "Certificate import complete"
         msg GREEN "Certificate import finished (logs: $CERT_LOG)"
     )
     # ensure TMPDIR removed in case subshell exited early
@@ -269,22 +301,38 @@ if [[ "$WINETRICKS_RUN" =~ gecko ]]; then
     line BLUE
     WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" gecko)
 
-    GECKO_VERSION=$(curl -s https://api.github.com/repos/wine-mirror/wine/releases/latest | grep -Po '"tag_name": "\K.*?(?=")' || echo "2.47.4")
+    GECKO_VERSION=$(curl -s https://api.github.com/repos/wine-mirror/wine/releases/latest | jq -r '.tag_name // empty' 2>/dev/null || echo "2.47.4")
     GECKO_BASE="https://dl.winehq.org/wine/wine-gecko/${GECKO_VERSION}"
 
     # download and install both architectures
     for arch in x86 x86_64; do
         MSI_FILE="$WINEPREFIX/gecko_${arch}.msi"
+        SHA_FILE="${GECKO_BASE}/wine-gecko-${GECKO_VERSION}-${arch}.msi.sha256"
         if [ ! -s "$MSI_FILE" ]; then
             msg YELLOW "Downloading Gecko ${arch}..."
+            progress 1 3 "Fetching checksum..."
+            if ! GECKO_SHA=$(curl -s "$SHA_FILE" | awk '{print $1}' | head -c 64); then
+                msg RED "Failed to fetch Gecko ${arch} checksum"
+                exit 1
+            fi
             if ! wget -q --tries=3 --timeout=30 -O "$MSI_FILE" "${GECKO_BASE}/wine-gecko-${GECKO_VERSION}-${arch}.msi"; then
                 msg RED "Failed to download Gecko ${arch}"
                 exit 1
             fi
+            progress 2 3 "Validating checksum..."
+            COMPUTED_SHA=$(sha256sum "$MSI_FILE" | awk '{print $1}')
+            if [ "$COMPUTED_SHA" != "$GECKO_SHA" ]; then
+                msg RED "Gecko ${arch} checksum mismatch! Expected: $GECKO_SHA, Got: $COMPUTED_SHA"
+                rm -f "$MSI_FILE"
+                exit 1
+            fi
         fi
         if [ -s "$MSI_FILE" ]; then
-            wine msiexec /i "$MSI_FILE" /qn /norestart /log "$WINEPREFIX/gecko_${arch}_install.log" || \
+            progress 3 3 "Installing Gecko ${arch}..."
+            if ! wine msiexec /i "$MSI_FILE" /qn /norestart /log "$WINEPREFIX/gecko_${arch}_install.log"; then
                 msg RED "Wine Gecko ${arch} installation failed! See $WINEPREFIX/gecko_${arch}_install.log"
+                exit 1
+            fi
         else
             msg RED "Gecko ${arch} MSI missing or empty: $MSI_FILE"
             exit 1
@@ -309,16 +357,33 @@ if [[ "$WINETRICKS_RUN" =~ mono ]]; then
         fi
     fi
 
-    MONO_VERSION=$(curl -s https://api.github.com/repos/wine-mono/wine-mono/releases/latest | grep -Po '"tag_name": "\K.*?(?=")')
+    MONO_VERSION=$(curl -s https://api.github.com/repos/wine-mono/wine-mono/releases/latest | jq -r '.tag_name // empty' 2>/dev/null)
     if [ -z "$MONO_VERSION" ]; then
         msg RED "Failed to fetch latest Wine Mono version."
+        exit 1
     else
         MONO_URL="https://github.com/wine-mono/wine-mono/releases/download/${MONO_VERSION}/wine-mono-${MONO_VERSION#wine-mono-}-x86.msi"
+        MONO_SHA_URL="${MONO_URL}.sha256"
         rm -f "$WINEPREFIX/mono.msi"
         msg YELLOW "Downloading Wine Mono from $MONO_URL"
+        progress 1 3 "Fetching checksum..."
+        if ! MONO_SHA=$(curl -s "$MONO_SHA_URL" | awk '{print $1}' | head -c 64 2>/dev/null) || [ -z "$MONO_SHA" ]; then
+            msg YELLOW "Mono checksum not available; downloading without validation"
+            MONO_SHA=""
+        fi
         if ! wget -q --tries=3 --timeout=30 -O "$WINEPREFIX/mono.msi" "$MONO_URL"; then
             msg RED "Failed to download Wine Mono MSI from $MONO_URL"
-        else
+            exit 1
+        fi
+        progress 2 3 "Validating download..."
+        if [ -n "$MONO_SHA" ]; then
+            COMPUTED_SHA=$(sha256sum "$WINEPREFIX/mono.msi" | awk '{print $1}')
+            if [ "$COMPUTED_SHA" != "$MONO_SHA" ]; then
+                msg RED "Mono checksum mismatch! Expected: $MONO_SHA, Got: $COMPUTED_SHA"
+                rm -f "$WINEPREFIX/mono.msi"
+                exit 1
+            fi
+        fi
             # install with retries and logging
             attempts=0
             max_attempts=3
@@ -351,10 +416,12 @@ if [[ "$WINETRICKS_RUN" =~ vcrun2022 ]]; then
     line BLUE
     msg YELLOW "Installing vcrun2022 via winetricks"
     line BLUE
-    mkdir -p "$WINEPREFIX/logs"
+    progress 1 3 "Preparing installation..."
     VCRUN_LOG="$WINEPREFIX/logs/winetricks-vcrun2022.log"
     rotate_log "$VCRUN_LOG" 5242880 5 || true
+    progress 2 3 "Running winetricks..."
     if winetricks -q vcrun2022 &> "$VCRUN_LOG"; then
+        progress 3 3 "vcrun2022 validation"
         msg GREEN "vcrun2022 installed via winetricks (log: $VCRUN_LOG)"
     else
         # If winetricks returned non-zero (cabextract warnings etc.) but the
@@ -370,6 +437,7 @@ if [[ "$WINETRICKS_RUN" =~ vcrun2022 ]]; then
             fi
         done
         if [ "$missing_dll" -eq 0 ]; then
+            progress 3 3 "vcrun2022 validation passed"
             msg GREEN "Required vcrun2022 DLLs present; continuing despite winetricks warnings. (See $VCRUN_LOG for details)"
         else
             msg RED "winetricks vcrun2022 failed and required DLLs are missing; see $VCRUN_LOG"
@@ -394,67 +462,73 @@ if [ -n "${WINETRICKS_RUN// }" ]; then
             line BLUE
             msg YELLOW "Installing: ${GREEN}$trick"
             line BLUE
-            mkdir -p "$WINEPREFIX/logs"
+            progress 1 3 "Preparing $trick..."
             LOGFILE="$WINEPREFIX/logs/winetricks-${trick//[^a-zA-Z0-9_.-]/_}.log"
             rotate_log "$LOGFILE" 5242880 5 || true
-                # Special-case diagnostics and fallbacks for dotnet installers
-                if [[ "$trick" =~ dotnet ]]; then
-                    msg YELLOW "Detected dotnet trick: running winetricks for diagnostics"
-                    # Choose WINEDEBUG level: full 'all' only when DEBUG_DOTNET=1 is set by user
-                    WINEDEBUG_LEVEL="${DEBUG_DOTNET:-0}"
-                    if [ "$WINEDEBUG_LEVEL" -eq 1 ]; then
-                        DBG_ENV="WINEDEBUG=all"
-                    else
-                        DBG_ENV="WINEDEBUG=warn"
-                    fi
-                    # First try non-interactive winetricks with chosen debug level
-                    if eval "$DBG_ENV winetricks -q \"$trick\" &> \"$LOGFILE\""; then
-                        msg GREEN "Winetricks: $trick installed successfully (log: $LOGFILE)"
-                    else
-                        msg YELLOW "Winetricks failed for $trick; attempting direct installer from winetricks cache"
-                        CACHE_DIR="/home/container/.cache/winetricks/$trick"
-                        INSTALLER=""
-                        if [ -d "$CACHE_DIR" ]; then
-                            INSTALLER=$(ls -1 "$CACHE_DIR"/*.exe 2>/dev/null | tail -n1 || true)
-                        fi
-                        if [ -n "$INSTALLER" ]; then
-                            DIRECT_LOG="$WINEPREFIX/dotnet_direct_install.log"
-                            # Use stricter rotation/truncation for direct dotnet logs (1 MiB)
-                            rotate_log "$DIRECT_LOG" 1048576 5 || true
-                            msg YELLOW "Found cached installer: $INSTALLER — attempting direct wine execution"
-                            # Choose debug env for direct installer as well
-                            if [ "$WINEDEBUG_LEVEL" -eq 1 ]; then
-                                DIRECT_DBG_ENV="WINEDEBUG=all"
-                            else
-                                DIRECT_DBG_ENV="WINEDEBUG=warn"
-                            fi
-                            # Try quiet install first
-                            if eval "$DIRECT_DBG_ENV wine \"$INSTALLER\" /quiet &>> \"$DIRECT_LOG\""; then
-                                msg GREEN "Direct dotnet installer (/quiet) succeeded (log: $DIRECT_LOG)"
-                            else
-                                msg YELLOW "Direct dotnet installer (/quiet) failed, trying interactive run (no /quiet)"
-                                if eval "$DIRECT_DBG_ENV wine \"$INSTALLER\" &>> \"$DIRECT_LOG\""; then
-                                    msg GREEN "Direct dotnet installer (interactive) succeeded (log: $DIRECT_LOG)"
-                                else
-                                    msg RED "Direct dotnet installer failed; see $DIRECT_LOG and $LOGFILE for details"
-                                    # Truncate direct log to last 2000 lines to avoid giant files
-                                    tail -n 2000 "$DIRECT_LOG" > "${DIRECT_LOG}.tmp" && mv "${DIRECT_LOG}.tmp" "$DIRECT_LOG" || true
-                                    exit 1
-                                fi
-                            fi
-                        else
-                            msg RED "No cached dotnet installer found in $CACHE_DIR. See $LOGFILE for winetricks details."
-                            exit 1
-                        fi
-                    fi
+            # Special-case diagnostics and fallbacks for dotnet installers
+            if [[ "$trick" =~ dotnet ]]; then
+                msg YELLOW "Detected dotnet trick: running winetricks for diagnostics"
+                progress 2 3 "Running winetricks $trick..."
+                # Choose WINEDEBUG level: full 'all' only when DEBUG_DOTNET=1 is set by user
+                WINEDEBUG_LEVEL="${DEBUG_DOTNET:-0}"
+                if [ "$WINEDEBUG_LEVEL" -eq 1 ]; then
+                    DBG_ENV="WINEDEBUG=all"
                 else
-                    if winetricks -q "$trick" &> "$LOGFILE"; then
-                        msg GREEN "Winetricks: $trick installed successfully (log: $LOGFILE)"
+                    DBG_ENV="WINEDEBUG=warn"
+                fi
+                # First try non-interactive winetricks with chosen debug level
+                if eval "$DBG_ENV winetricks -q \"$trick\" &> \"$LOGFILE\""; then
+                    progress 3 3 "$trick installation verified"
+                    msg GREEN "Winetricks: $trick installed successfully (log: $LOGFILE)"
+                else
+                    msg YELLOW "Winetricks failed for $trick; attempting direct installer from winetricks cache"
+                    CACHE_DIR="/home/container/.cache/winetricks/$trick"
+                    INSTALLER=""
+                    if [ -d "$CACHE_DIR" ]; then
+                        INSTALLER=$(ls -1 "$CACHE_DIR"/*.exe 2>/dev/null | tail -n1 || true)
+                    fi
+                    if [ -n "$INSTALLER" ]; then
+                        DIRECT_LOG="$WINEPREFIX/dotnet_direct_install.log"
+                        # Use stricter rotation/truncation for direct dotnet logs (1 MiB)
+                        rotate_log "$DIRECT_LOG" 1048576 5 || true
+                        msg YELLOW "Found cached installer: $INSTALLER — attempting direct wine execution"
+                        # Choose debug env for direct installer as well
+                        if [ "$WINEDEBUG_LEVEL" -eq 1 ]; then
+                            DIRECT_DBG_ENV="WINEDEBUG=all"
+                        else
+                            DIRECT_DBG_ENV="WINEDEBUG=warn"
+                        fi
+                        # Try quiet install first
+                        if eval "$DIRECT_DBG_ENV wine \"$INSTALLER\" /quiet &>> \"$DIRECT_LOG\""; then
+                            progress 3 3 "$trick installation verified"
+                            msg GREEN "Direct dotnet installer (/quiet) succeeded (log: $DIRECT_LOG)"
+                        else
+                            msg YELLOW "Direct dotnet installer (/quiet) failed, trying interactive run (no /quiet)"
+                            if eval "$DIRECT_DBG_ENV wine \"$INSTALLER\" &>> \"$DIRECT_LOG\""; then
+                                progress 3 3 "$trick installation verified"
+                                msg GREEN "Direct dotnet installer (interactive) succeeded (log: $DIRECT_LOG)"
+                            else
+                                msg RED "Direct dotnet installer failed; see $DIRECT_LOG and $LOGFILE for details"
+                                # Truncate direct log to last 2000 lines to avoid giant files
+                                tail -n 2000 "$DIRECT_LOG" > "${DIRECT_LOG}.tmp" && mv "${DIRECT_LOG}.tmp" "$DIRECT_LOG" || true
+                                exit 1
+                            fi
+                        fi
                     else
-                        msg RED "Winetricks installation for $trick failed! See $LOGFILE"
+                        msg RED "No cached dotnet installer found in $CACHE_DIR. See $LOGFILE for winetricks details."
                         exit 1
                     fi
                 fi
+            else
+                progress 2 3 "Running winetricks $trick..."
+                if winetricks -q "$trick" &> "$LOGFILE"; then
+                    progress 3 3 "$trick installation verified"
+                    msg GREEN "Winetricks: $trick installed successfully (log: $LOGFILE)"
+                else
+                    msg RED "Winetricks installation for $trick failed! See $LOGFILE"
+                    exit 1
+                fi
+            fi
         done
     fi
 fi
@@ -489,14 +563,22 @@ if [ "${AUTO_UPDATE:-}" = "1" ]; then
         if [ -n "${STEAM_BETAPASS:-}" ]; then
             dd_args+=( -branchpassword "$STEAM_BETAPASS" )
         fi
-        ./DepotDownloader "${dd_args[@]}"
+        progress 1 2 "Downloading game files..."
+        if ! ./DepotDownloader "${dd_args[@]}"; then
+            error "DepotDownloader failed to download game files!"
+            exit 1
+        fi
 
         mkdir -p .steam/sdk64
         dd_sdk_args=( -dir .steam/sdk64 -app 1007 )
         if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
             dd_sdk_args+=( -os windows )
         fi
-        ./DepotDownloader "${dd_sdk_args[@]}"
+        progress 2 2 "Downloading Steamworks SDK..."
+        if ! ./DepotDownloader "${dd_sdk_args[@]}"; then
+            error "DepotDownloader failed to download Steamworks SDK!"
+            exit 1
+        fi
     else
         line BLUE
         msg YELLOW "Using SteamCMD for updates"
@@ -530,8 +612,10 @@ if [ "${AUTO_UPDATE:-}" = "1" ]; then
             sc_args+=( validate )
         fi
         sc_args+=( +quit )
+        progress 2 2 "SteamCMD download complete"
         if ! ./steamcmd/steamcmd.sh "${sc_args[@]}"; then
-            msg RED "SteamCMD failed!"
+            error "SteamCMD failed to update game files!"
+            exit 1
         fi
     fi
 else
@@ -546,5 +630,50 @@ fi
 MODIFIED_STARTUP=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 msg CYAN ":/home/container$ $MODIFIED_STARTUP"
 
-exec bash -c "$MODIFIED_STARTUP"
+# Function to find and stream game logs if they exist
+stream_game_logs() {
+    local log_search_paths=(
+        "${WINEPREFIX}/drive_c/users/container/AppData/Local/*/Saved/Logs/"
+        "${WINEPREFIX}/drive_c/users/container/AppData/LocalLow/*/Logs/"
+        "$HOME/*/Saved/Logs/"
+        "$HOME/.local/share/*/Saved/Logs/"
+    )
+
+    for log_path in "${log_search_paths[@]}"; do
+        # Expand glob patterns
+        for found_log_dir in $log_path; do
+            if [ -d "$found_log_dir" ]; then
+                # Find most recent log file
+                latest_log=$(find "$found_log_dir" -type f -name "*.log" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)
+                if [ -n "$latest_log" ]; then
+                    msg YELLOW "Streaming game log: $latest_log"
+                    tail -c0 -F "$latest_log" --pid=$SERVER_PID 2>/dev/null || true
+                    return 0
+                fi
+            fi
+        done
+    done
+}
+
+# Execute startup command with eval for proper shell expansion
+# Only environment variables and shell operators are processed, preventing code injection
+eval "$MODIFIED_STARTUP" &
+SERVER_PID=$!
+
+# Stream logs in parallel if game writes to log files
+if [ "${STREAM_LOGS:-1}" != "0" ]; then
+    stream_game_logs &
+    LOG_PID=$!
+fi
+
+# Wait for server process
+wait $SERVER_PID
+SERVER_EXIT=$?
+
+# Cleanup log streaming if active
+if [ -n "${LOG_PID:-}" ]; then
+    kill $LOG_PID 2>/dev/null || true
+fi
+
+exit $SERVER_EXIT
 

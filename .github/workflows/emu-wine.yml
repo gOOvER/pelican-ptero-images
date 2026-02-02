@@ -47,9 +47,11 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: ./wine
-          file: "./wine/${{ matrix.tag }}/Dockerfile"
+          file: "./wine/Dockerfile"
           platforms: linux/amd64
           push: true
           tags: "ghcr.io/goover/wine:${{ matrix.tag }}"
+          build-args: |
+            WINE_BRANCH=${{ matrix.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
