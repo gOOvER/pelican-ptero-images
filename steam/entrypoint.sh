@@ -55,6 +55,8 @@ line() {
     local color="${1:-BLUE}"
     local term_width
     term_width=$(tput cols 2>/dev/null || echo 70)
+    # Cap line width at 120 characters for readability
+    [ "$term_width" -gt 120 ] && term_width=120
     local sep
     sep=$(printf '%*s' "$term_width" '' | tr ' ' '-')
 
