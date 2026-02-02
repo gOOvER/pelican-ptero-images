@@ -11,12 +11,13 @@ on:
     paths:
       - dev/go/**
 
-env:
-  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
 permissions:
   contents: read
   packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   push:
@@ -60,3 +61,5 @@ jobs:
           push: true
           tags: |
             ghcr.io/goover/go:${{ matrix.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

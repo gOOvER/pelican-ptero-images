@@ -1,7 +1,6 @@
 name: build games
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * 1"
@@ -14,9 +13,6 @@ on:
 permissions:
   contents: read
   packages: write
-
-env:
-  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
 jobs:
   push:
@@ -43,6 +39,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+
+      - uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

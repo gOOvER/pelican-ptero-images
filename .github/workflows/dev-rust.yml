@@ -11,12 +11,13 @@ on:
     paths:
       - dev/rust/*
 
-env:
-  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
 permissions:
   contents: read
   packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   push:
@@ -27,22 +28,22 @@ jobs:
       matrix:
         tag:
           - latest
-    
+
     steps:
       - uses: actions/checkout@v6
 
       - uses: docker/setup-qemu-action@v3
-      
+
       - uses: docker/setup-buildx-action@v3
         with:
           buildkitd-flags: --debug
-      
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - uses: docker/build-push-action@v6
         with:
           context: ./dev/rust
@@ -51,3 +52,5 @@ jobs:
           push: true
           tags: |
             ghcr.io/goover/rust:${{ matrix.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

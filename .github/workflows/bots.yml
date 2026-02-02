@@ -11,9 +11,6 @@ on:
     paths:
       - bots/**
 
-env:
-  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
 permissions:
   contents: read
   packages: write
@@ -66,4 +63,6 @@ jobs:
           tags: |
             ghcr.io/${{ steps.vars.outputs.owner }}/bots:${{ matrix.tag }}
             ghcr.io/${{ steps.vars.outputs.owner }}/bots:${{ matrix.tag }}-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
         timeout-minutes: 45
