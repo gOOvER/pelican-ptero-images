@@ -215,16 +215,17 @@ if [ -n "${STEAM_APPID:-}" ]; then
 
     # Set WINEPREFIX to the per-App compatibilityprefix derived from STEAM_DIR (non-destructive).
     if [ -z "${WINEPREFIX:-}" ]; then
+        # Ensure XDG_CONFIG_HOME is defined first for Wine/Proton
+        if [ -z "${XDG_CONFIG_HOME:-}" ]; then
+            export XDG_CONFIG_HOME="$HOME/.config"
+        fi
+
         WINEPREFIX="$STEAM_DIR/steamapps/compatdata/${STEAM_APPID}/pfx"
         mkdir -p "${WINEPREFIX%/pfx}" "${WINEPREFIX}" "$XDG_CONFIG_HOME" 2>/dev/null || true
         export WINEPREFIX
         msg GREEN "WINEPREFIX set to $WINEPREFIX"
 
-        # Ensure XDG_CONFIG_HOME is defined for Wine/Proton
-        if [ -z "${XDG_CONFIG_HOME:-}" ]; then
-            export XDG_CONFIG_HOME="$HOME/.config"
-            mkdir -p "$XDG_CONFIG_HOME" 2>/dev/null || true
-        fi
+        # Ensure directory permissions
         chmod 700 "$XDG_CONFIG_HOME" 2>/dev/null || true
     fi
 
