@@ -87,6 +87,7 @@ RUN set -eux; cd /tmp; \
     # Validate checksum if available
     if [ -n "$PROTON_CHECKSUM_URL" ]; then \
         curl -sSL "$PROTON_CHECKSUM_URL" -o proton-ge.sha512sum && \
+        sed -i "s/GE-Proton[0-9.]*\.tar\.gz/proton-ge.tar.gz/g" proton-ge.sha512sum && \
         sha512sum -c proton-ge.sha512sum || { echo "Proton-GE checksum validation failed" >&2; exit 1; }; \
     fi; \
     # Extract and normalize directory name
