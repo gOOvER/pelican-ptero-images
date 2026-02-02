@@ -307,49 +307,41 @@ fi
 if [ "${AUTO_UPDATE:-}" = "1" ]; then
     if [ -f ./DepotDownloader ]; then
         progress 1 2 "Using DepotDownloader for server files update"
+
+        if ! command -v mono >/dev/null 2>&1 && file ./DepotDownloader | grep -qi 'PE32'; then
+            msg YELLOW "DepotDownloader looks like a .NET app; ensure 'mono' is available or it is executable"
+        fi
+
+        # Build DepotDownloader arguments safely to avoid word-splitting
+        dd_args=( -dir . -username "$STEAM_USER" -password "${STEAM_PASS:-}" -remember-password )
+        if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
+            dd_args+=( -os windows )
+        fi
+        dd_args+=( -app "$STEAM_APPID" )
+        if [ -n "${STEAM_BETAID:-}" ]; then
+            dd_args+=( -branch "$STEAM_BETAID" )
+        fi
+        if [ -n "${STEAM_BETAPASS:-}" ]; then
+            dd_args+=( -branchpassword "$STEAM_BETAPASS" )
+        fi
+
+        ./DepotDownloader "${dd_args[@]}" || { msg RED "DepotDownloader failed"; exit 1; }
+
+        mkdir -p .steam/sdk64
+        dd_sdk_args=( -dir .steam/sdk64 -app 1007 )
+        if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
+            dd_sdk_args+=( -os windows )
+        fi
+        ./DepotDownloader "${dd_sdk_args[@]}" || { msg RED "DepotDownloader SDK download failed"; exit 1; }
+
+        chmod +x "$HOME"/* 2>/dev/null || true
     else
         progress 1 2 "Using SteamCMD for server files update"
-    fi
+        printf "${YELLOW}Steam user: ${GREEN}%s${NC}\n" "$STEAM_USER"
 
-    printf "${YELLOW}Steam user: ${GREEN}%s${NC}\n" "$STEAM_USER"
-
-    if ! command -v mono >/dev/null 2>&1 && file ./DepotDownloader | grep -qi 'PE32'; then
-        msg YELLOW "DepotDownloader looks like a .NET app; ensure 'mono' is available or it is executable"
-    fi
-
-    # Build DepotDownloader arguments safely to avoid word-splitting
-    dd_args=( -dir . -username "$STEAM_USER" -password "${STEAM_PASS:-}" -remember-password )
-    if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
-        dd_args+=( -os windows )
-    fi
-    dd_args+=( -app "$STEAM_APPID" )
-    if [ -n "${STEAM_BETAID:-}" ]; then
-        dd_args+=( -branch "$STEAM_BETAID" )
-    fi
-    if [ -n "${STEAM_BETAPASS:-}" ]; then
-        dd_args+=( -branchpassword "$STEAM_BETAPASS" )
-    fi
-
-    ./DepotDownloader "${dd_args[@]}" || { msg RED "DepotDownloader failed"; exit 1; }
-
-    mkdir -p .steam/sdk64
-    dd_sdk_args=( -dir .steam/sdk64 -app 1007 )
-    if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
-        dd_sdk_args+=( -os windows )
-    fi
-    ./DepotDownloader "${dd_sdk_args[@]}" || { msg RED "DepotDownloader SDK download failed"; exit 1; }
-
-    chmod +x "$HOME"/* 2>/dev/null || true
-else
-    line BLUE
-    msg YELLOW "Using SteamCMD for updates"
-    line BLUE
-
-    printf "${YELLOW}Steam user: ${GREEN}%s${NC}\n" "$STEAM_USER"
-
-    if [ ! -x ./steamcmd/steamcmd.sh ]; then
-        msg RED "steamcmd not found or not executable at ./steamcmd/steamcmd.sh"
-    else
+        if [ ! -x ./steamcmd/steamcmd.sh ]; then
+            msg RED "steamcmd not found or not executable at ./steamcmd/steamcmd.sh"
+        else
             # Build steamcmd arguments safely
             sc_args=( +force_install_dir /home/container +login "$STEAM_USER" "${STEAM_PASS:-}" "${STEAM_AUTH:-}" )
             if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
@@ -377,8 +369,8 @@ else
             sc_args+=( +quit )
 
             ./steamcmd/steamcmd.sh "${sc_args[@]}" || { msg RED "SteamCMD failed"; exit 1; }
+        fi
     fi
-fi
 else
     line BLUE
     info "Auto Update disabled - skipping server files update"
