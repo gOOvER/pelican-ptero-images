@@ -384,26 +384,25 @@ if [[ "$WINETRICKS_RUN" =~ mono ]]; then
                 exit 1
             fi
         fi
-            # install with retries and logging
-            attempts=0
-            max_attempts=3
-            rc=1
-            while [ "$attempts" -lt "$max_attempts" ]; do
-                attempts=$((attempts+1))
-                msg YELLOW "Attempt $attempts to install Wine Mono..."
-                if wine msiexec /i "$WINEPREFIX/mono.msi" /qn /norestart /log "$WINEPREFIX/mono_install.log"; then
-                    rc=0
-                    msg GREEN "Wine Mono installed successfully on attempt $attempts"
-                    break
-                else
-                        msg YELLOW "Wine Mono installer failed on attempt $attempts (see $WINEPREFIX/mono_install.log)"
-                    sleep 3
-                fi
-            done
-            if [ "$rc" -ne 0 ]; then
-                    msg RED "Wine Mono installation failed after $max_attempts attempts. See $WINEPREFIX/mono_install.log"
-                    exit 1
+        # install with retries and logging
+        attempts=0
+        max_attempts=3
+        rc=1
+        while [ "$attempts" -lt "$max_attempts" ]; do
+            attempts=$((attempts+1))
+            msg YELLOW "Attempt $attempts to install Wine Mono..."
+            if wine msiexec /i "$WINEPREFIX/mono.msi" /qn /norestart /log "$WINEPREFIX/mono_install.log"; then
+                rc=0
+                msg GREEN "Wine Mono installed successfully on attempt $attempts"
+                break
+            else
+                msg YELLOW "Wine Mono installer failed on attempt $attempts (see $WINEPREFIX/mono_install.log)"
+                sleep 3
             fi
+        done
+        if [ "$rc" -ne 0 ]; then
+            msg RED "Wine Mono installation failed after $max_attempts attempts. See $WINEPREFIX/mono_install.log"
+            exit 1
         fi
     fi
     WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" mono)
