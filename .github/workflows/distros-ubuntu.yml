@@ -31,10 +31,10 @@ jobs:
           - '20-focal'
           - '22-jammy'
           - '24-noble'
-    
+
     steps:
       - uses: actions/checkout@v6
-      
+
       - uses: docker/setup-qemu-action@v3
 
       - uses: docker/setup-buildx-action@v3
@@ -46,7 +46,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - uses: docker/build-push-action@v6
         with:
           context: ./distros/ubuntu/${{ matrix.oses }}
