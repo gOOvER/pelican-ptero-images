@@ -130,6 +130,19 @@ export PROTON_LOG=1
 export PROTON_LOG_DIR="${PROTON_LOG_DIR:-/home/container/logs}"
 mkdir -p "$PROTON_LOG_DIR"
 
+# Create separate log directories for organization
+mkdir -p "$PROTON_LOG_DIR/proton"
+mkdir -p "$PROTON_LOG_DIR/server"
+
+# Enhanced Proton logging (logs will be in $PROTON_LOG_DIR/proton/)
+export PROTON_LOG_DIR="$PROTON_LOG_DIR/proton"
+
+# Enable verbose Wine logging for crash diagnosis
+export WINEDEBUG="${WINEDEBUG:-warn+all}"
+
+# Track crashes and errors
+export PROTON_CRASH_REPORT_DIR="$PROTON_LOG_DIR"
+
 # Disable Steam client integration for dedicated servers (faster, less resources)
 export PROTON_NO_STEAM=1
 
@@ -476,15 +489,38 @@ if [ -n "${WINETRICKS_RUN:-}" ]; then
                 fi
             fi
 
-            # Run winetricks with optional options. We intentionally allow
-            # the shell to split $WINETRICKS_RUN into separate verbs so
-            # multiple verbs can be passed in one invocation.
-            WINETRICKS_EXIT=0
-            if [ -n "${WINETRICKS_OPTS:-}" ]; then
-                info "Running winetricks with options"
-                env WINEPREFIX="$WINEPREFIX" WINETRICKS_QUIET=0 "$WINETRICKS" $WINETRICKS_OPTS $WINETRICKS_RUN 2>&1 | tee "$WINETRICKS_LOGFILE" || WINETRICKS_EXIT=${PIPESTATUS[0]}
+            # Check if packages are already installed to avoid re-installation errors
+            info "Checking for already installed packages..."
+            INSTALLED_PACKAGES=$(env WINEPREFIX="$WINEPREFIX" "$WINETRICKS" list-installed 2>/dev/null || true)
+            PACKAGES_TO_INSTALL=""
+
+            for pkg in $WINETRICKS_RUN; do
+                if echo "$INSTALLED_PACKAGES" | grep -q "^${pkg}$"; then
+                    success "$pkg is already installed - skipping"
+                else
+                    PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $pkg"
+                fi
+            done
+
+            # Trim whitespace
+            PACKAGES_TO_INSTALL=$(echo "$PACKAGES_TO_INSTALL" | xargs)
+
+            if [ -z "$PACKAGES_TO_INSTALL" ]; then
+                success "All requested packages already installed"
+                WINETRICKS_EXIT=0
             else
-                env WINEPREFIX="$WINEPREFIX" WINETRICKS_QUIET=0 "$WINETRICKS" $WINETRICKS_RUN 2>&1 | tee "$WINETRICKS_LOGFILE" || WINETRICKS_EXIT=${PIPESTATUS[0]}
+                info "Installing packages: $PACKAGES_TO_INSTALL"
+
+                # Run winetricks with optional options. We intentionally allow
+                # the shell to split $WINETRICKS_RUN into separate verbs so
+                # multiple verbs can be passed in one invocation.
+                WINETRICKS_EXIT=0
+                if [ -n "${WINETRICKS_OPTS:-}" ]; then
+                    info "Running winetricks with options"
+                    env WINEPREFIX="$WINEPREFIX" WINETRICKS_QUIET=0 "$WINETRICKS" $WINETRICKS_OPTS $PACKAGES_TO_INSTALL 2>&1 | tee "$WINETRICKS_LOGFILE" || WINETRICKS_EXIT=${PIPESTATUS[0]}
+                else
+                    env WINEPREFIX="$WINEPREFIX" WINETRICKS_QUIET=0 "$WINETRICKS" $PACKAGES_TO_INSTALL 2>&1 | tee "$WINETRICKS_LOGFILE" || WINETRICKS_EXIT=${PIPESTATUS[0]}
+                fi
             fi
 
             if [ $WINETRICKS_EXIT -eq 0 ]; then
@@ -522,8 +558,14 @@ line BLUE
 progress 3 3 "Starting server"
 line BLUE
 
+# Prepare server startup logging
+SERVER_LOG="/home/container/logs/server/startup_$(date +%s).log"
+mkdir -p "$(dirname "$SERVER_LOG")"
+
 MODIFIED_STARTUP=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 msg CYAN ":/home/container$ $MODIFIED_STARTUP"
+info "Server output log: $SERVER_LOG"
+info "Proton logs directory: $PROTON_LOG_DIR"
 
 # Function to find and stream game logs if they exist
 stream_game_logs() {
@@ -552,12 +594,13 @@ stream_game_logs() {
 
 # Execute startup command with eval for proper shell expansion
 # Only environment variables and shell operators are processed, preventing code injection
-eval "$MODIFIED_STARTUP" &
+eval "$MODIFIED_STARTUP" 2>&1 | tee -a "$SERVER_LOG" &
 SERVER_PID=$!
 
 # Validate that the process was actually started
 if ! kill -0 $SERVER_PID 2>/dev/null; then
-    msg RED "Failed to start server process - command may have failed immediately"
+    error "Failed to start server process - command may have failed immediately"
+    warning "Check logs: $SERVER_LOG"
     exit 1
 fi
 
@@ -569,11 +612,69 @@ if [ "${STREAM_LOGS:-1}" != "0" ]; then
     LOG_PID=$!
 fi
 
+# Monitor for early crashes (first 5 seconds)
+info "Monitoring for early crashes..."
+sleep 2
+if ! kill -0 $SERVER_PID 2>/dev/null; then
+    error "Server crashed within 2 seconds of startup!"
+    line RED
+    msg RED "Crash Diagnosis:"
+
+    # Show last lines of server log
+    if [ -f "$SERVER_LOG" ]; then
+        msg YELLOW "Last 20 lines of server output:"
+        tail -n 20 "$SERVER_LOG" | while IFS= read -r line; do
+            printf "  %s\n" "$line"
+        done
+    fi
+
+    # Show Proton logs if they exist
+    if [ -d "$PROTON_LOG_DIR" ]; then
+        msg YELLOW "Proton logs available in: $PROTON_LOG_DIR"
+        latest_proton_log=$(find "$PROTON_LOG_DIR" -type f -name "*.log" -o -name "steam-*" | sort -r | head -n1)
+        if [ -n "$latest_proton_log" ]; then
+            msg YELLOW "Latest Proton log: $latest_proton_log"
+            msg YELLOW "Last 15 lines:"
+            tail -n 15 "$latest_proton_log" 2>/dev/null | while IFS= read -r line; do
+                printf "  %s\n" "$line"
+            done
+        fi
+    fi
+
+    # Check for Wine crashes
+    if [ -f "${WINEPREFIX:-}/drive_c/windows/system32/crashdump.txt" ]; then
+        msg YELLOW "Wine crash dump found:"
+        cat "${WINEPREFIX}/drive_c/windows/system32/crashdump.txt" | while IFS= read -r line; do
+            printf "  %s\n" "$line"
+        done
+    fi
+
+    line RED
+    info "Full logs: $SERVER_LOG"
+    info "Proton logs: $PROTON_LOG_DIR"
+    exit 1
+fi
+
+success "Server survived initial startup checks"
+
 # Wait for server process
 if wait $SERVER_PID 2>/dev/null; then
     SERVER_EXIT=0
 else
     SERVER_EXIT=$?
+
+    # Server exited with error
+    if [ $SERVER_EXIT -ne 0 ]; then
+        line RED
+        error "Server exited with code $SERVER_EXIT"
+        msg YELLOW "Last 30 lines of output:"
+        tail -n 30 "$SERVER_LOG" 2>/dev/null | while IFS= read -r line; do
+            printf "  %s\n" "$line"
+        done
+        line RED
+        info "Full logs: $SERVER_LOG"
+        info "Proton logs: $PROTON_LOG_DIR"
+    fi
 fi
 
 # Cleanup log streaming if active
