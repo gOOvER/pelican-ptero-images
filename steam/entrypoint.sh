@@ -478,6 +478,14 @@ stream_game_logs() {
 eval "$MODIFIED_STARTUP" &
 SERVER_PID=$!
 
+# Validate that the process was actually started
+if ! kill -0 $SERVER_PID 2>/dev/null; then
+    msg RED "Failed to start server process - command may have failed immediately"
+    exit 1
+fi
+
+success "Server process started (PID: $SERVER_PID)"
+
 # Stream logs in parallel if game writes to log files
 if [ "${STREAM_LOGS:-1}" != "0" ]; then
     stream_game_logs &
@@ -485,8 +493,11 @@ if [ "${STREAM_LOGS:-1}" != "0" ]; then
 fi
 
 # Wait for server process
-wait $SERVER_PID
-SERVER_EXIT=$?
+if wait $SERVER_PID 2>/dev/null; then
+    SERVER_EXIT=0
+else
+    SERVER_EXIT=$?
+fi
 
 # Cleanup log streaming if active
 if [ -n "${LOG_PID:-}" ]; then
