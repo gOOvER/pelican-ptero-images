@@ -419,13 +419,61 @@ if [ -n "${WINETRICKS_RUN:-}" ]; then
             msg YELLOW "  Installing: ${GREEN}$WINETRICKS_RUN${NC}"
             info "Log file: $WINETRICKS_LOGFILE"
 
-            # Find Proton's Wine binaries if not already set
-            if [ -z "${WINE:-}" ] && [ -d "/opt/ProtonGE/proton" ]; then
-                export WINE="/opt/ProtonGE/proton wine"
-                info "Using Proton Wine from /opt/ProtonGE"
+            # Find Proton installation first
+            PROTON_PATH=""
+            for proton_base in /opt/ProtonGE /opt/GE-Proton* /usr/local/share/steam/compatibilitytools.d/ProtonGE /usr/local/share/steam/compatibilitytools.d/GE-Proton*; do
+                if [ -f "$proton_base/proton" ]; then
+                    PROTON_PATH="$proton_base"
+                    success "Found Proton: $PROTON_PATH"
+                    break
+                fi
+            done
+
+            if [ -z "$PROTON_PATH" ]; then
+                error "Could not find Proton installation"
+                info "Winetricks requires Proton to be installed"
+                exit 1
             fi
-            if [ -z "${WINESERVER:-}" ] && [ -d "/opt/ProtonGE/proton" ]; then
-                export WINESERVER="/opt/ProtonGE/proton wineserver"
+
+            # Initialize Wine prefix with Proton FIRST (critical step!)
+            info "Initializing Wine prefix with Proton..."
+            if "$PROTON_PATH/proton" run wineboot -u 2>&1 | tee -a "$WINETRICKS_LOGFILE"; then
+                success "Wine prefix initialized"
+            else
+                warning "Prefix initialization returned non-zero, but continuing..."
+            fi
+
+            # Now find and export Proton's Wine binaries for winetricks
+            # Proton stores wine64/wineserver in dist/bin or files/bin
+            if [ -z "${WINE:-}" ]; then
+                # Try dist/bin first (newer Proton-GE versions)
+                if [ -f "$PROTON_PATH/dist/bin/wine64" ]; then
+                    export WINE="$PROTON_PATH/dist/bin/wine64"
+                    export WINESERVER="$PROTON_PATH/dist/bin/wineserver"
+                    export WINELOADER="$PROTON_PATH/dist/bin/wine64"
+                    export PATH="$PROTON_PATH/dist/bin:$PATH"
+                    export LD_LIBRARY_PATH="$PROTON_PATH/dist/lib64:$PROTON_PATH/dist/lib:${LD_LIBRARY_PATH:-}"
+                    success "Using Proton Wine from dist/bin: $WINE"
+                # Try files/bin (older versions)
+                elif [ -f "$PROTON_PATH/files/bin/wine64" ]; then
+                    export WINE="$PROTON_PATH/files/bin/wine64"
+                    export WINESERVER="$PROTON_PATH/files/bin/wineserver"
+                    export WINELOADER="$PROTON_PATH/files/bin/wine64"
+                    export PATH="$PROTON_PATH/files/bin:$PATH"
+                    export LD_LIBRARY_PATH="$PROTON_PATH/files/lib64:$PROTON_PATH/files/lib:${LD_LIBRARY_PATH:-}"
+                    success "Using Proton Wine from files/bin: $WINE"
+                # Fallback: try dist/bin/wine (without 64 suffix)
+                elif [ -f "$PROTON_PATH/dist/bin/wine" ]; then
+                    export WINE="$PROTON_PATH/dist/bin/wine"
+                    export WINESERVER="$PROTON_PATH/dist/bin/wineserver"
+                    export WINELOADER="$PROTON_PATH/dist/bin/wine"
+                    export PATH="$PROTON_PATH/dist/bin:$PATH"
+                    export LD_LIBRARY_PATH="$PROTON_PATH/dist/lib64:$PROTON_PATH/dist/lib:${LD_LIBRARY_PATH:-}"
+                    success "Using Proton Wine: $WINE"
+                else
+                    warning "Could not find Wine binaries in Proton"
+                    info "Winetricks may fail without Wine"
+                fi
             fi
 
             # Run winetricks with optional options. We intentionally allow
