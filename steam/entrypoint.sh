@@ -398,6 +398,9 @@ is_valid_steam_dir() {
 if [ -n "${WINETRICKS_RUN:-}" ]; then
     # Default location for winetricks binary (can be overridden by env)
     WINETRICKS=${WINETRICKS:-/usr/sbin/winetricks}
+    WINETRICKS_LOG_DIR="${PROTON_LOG_DIR}/winetricks"
+    mkdir -p "$WINETRICKS_LOG_DIR"
+    WINETRICKS_LOGFILE="$WINETRICKS_LOG_DIR/install_$(date +%s).log"
 
     if [ -z "${WINEPREFIX:-}" ]; then
         error "WINETRICKS_RUN set but WINEPREFIX is empty"
@@ -414,20 +417,46 @@ if [ -n "${WINETRICKS_RUN:-}" ]; then
         if command -v "$WINETRICKS" >/dev/null 2>&1; then
             # Show intended actions
             msg YELLOW "  Installing: ${GREEN}$WINETRICKS_RUN${NC}"
+            info "Log file: $WINETRICKS_LOGFILE"
+
+            # Find Proton's Wine binaries if not already set
+            if [ -z "${WINE:-}" ] && [ -d "/opt/ProtonGE/proton" ]; then
+                export WINE="/opt/ProtonGE/proton wine"
+                info "Using Proton Wine from /opt/ProtonGE"
+            fi
+            if [ -z "${WINESERVER:-}" ] && [ -d "/opt/ProtonGE/proton" ]; then
+                export WINESERVER="/opt/ProtonGE/proton wineserver"
+            fi
 
             # Run winetricks with optional options. We intentionally allow
             # the shell to split $WINETRICKS_RUN into separate verbs so
             # multiple verbs can be passed in one invocation.
+            WINETRICKS_EXIT=0
             if [ -n "${WINETRICKS_OPTS:-}" ]; then
                 info "Running winetricks with options"
-                env WINEPREFIX="$WINEPREFIX" "$WINETRICKS" $WINETRICKS_OPTS $WINETRICKS_RUN || error "winetricks failed"
+                env WINEPREFIX="$WINEPREFIX" WINETRICKS_QUIET=0 "$WINETRICKS" $WINETRICKS_OPTS $WINETRICKS_RUN 2>&1 | tee "$WINETRICKS_LOGFILE" || WINETRICKS_EXIT=${PIPESTATUS[0]}
             else
-                env WINEPREFIX="$WINEPREFIX" "$WINETRICKS" $WINETRICKS_RUN || error "winetricks failed"
+                env WINEPREFIX="$WINEPREFIX" WINETRICKS_QUIET=0 "$WINETRICKS" $WINETRICKS_RUN 2>&1 | tee "$WINETRICKS_LOGFILE" || WINETRICKS_EXIT=${PIPESTATUS[0]}
             fi
-            success "Proton prefix setup complete"
+
+            if [ $WINETRICKS_EXIT -eq 0 ]; then
+                success "Proton prefix setup complete"
+            else
+                error "winetricks failed with exit code $WINETRICKS_EXIT"
+                warning "Full output saved to: $WINETRICKS_LOGFILE"
+                # Check if WINETRICKS_IGNORE_ERRORS is explicitly set to 1 to continue anyway
+                if [ "${WINETRICKS_IGNORE_ERRORS:-0}" != "1" ]; then
+                    info "Set WINETRICKS_IGNORE_ERRORS=1 to continue despite winetricks failures"
+                    info "View logs: cat '$WINETRICKS_LOGFILE'"
+                    exit 1
+                else
+                    warning "Continuing despite winetricks failures (WINETRICKS_IGNORE_ERRORS=1)"
+                fi
+            fi
         else
             error "winetricks not found at ${WINETRICKS}"
             info "Cannot install runtimes without winetricks"
+            exit 1
         fi
     fi
 fi
