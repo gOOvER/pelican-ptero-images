@@ -125,19 +125,20 @@ line BLUE
 # ----------------------------------------------------------
 # Set environment for Steam Proton
 # ----------------------------------------------------------
-# Enable Proton logging for debugging
-export PROTON_LOG=1
-export PROTON_LOG_DIR="${PROTON_LOG_DIR:-/home/container/logs}"
-mkdir -p "$PROTON_LOG_DIR"
+# Base log directory (don't override PROTON_LOG_DIR, use separate var)
+export BASE_LOG_DIR="/home/container/logs"
+mkdir -p "$BASE_LOG_DIR"
 
 # Create separate log directories for organization
-mkdir -p "$PROTON_LOG_DIR/proton"
-mkdir -p "$PROTON_LOG_DIR/server"
+export PROTON_LOG_DIR="$BASE_LOG_DIR/proton"
+export SERVER_LOG_DIR="$BASE_LOG_DIR/server"
+export WINETRICKS_LOG_DIR="$BASE_LOG_DIR/winetricks"
+mkdir -p "$PROTON_LOG_DIR" "$SERVER_LOG_DIR" "$WINETRICKS_LOG_DIR"
 
-# Enhanced Proton logging (logs will be in $PROTON_LOG_DIR/proton/)
-export PROTON_LOG_DIR="$PROTON_LOG_DIR/proton"
+# Enable Proton logging for debugging
+export PROTON_LOG=1
 
-# Enable verbose Wine logging for crash diagnosis
+# Enable verbose Wine logging for crash diagnosis (can be overridden)
 export WINEDEBUG="${WINEDEBUG:-warn+all}"
 
 # Track crashes and errors
@@ -411,8 +412,6 @@ is_valid_steam_dir() {
 if [ -n "${WINETRICKS_RUN:-}" ]; then
     # Default location for winetricks binary (can be overridden by env)
     WINETRICKS=${WINETRICKS:-/usr/sbin/winetricks}
-    WINETRICKS_LOG_DIR="${PROTON_LOG_DIR}/winetricks"
-    mkdir -p "$WINETRICKS_LOG_DIR"
     WINETRICKS_LOGFILE="$WINETRICKS_LOG_DIR/install_$(date +%s).log"
 
     if [ -z "${WINEPREFIX:-}" ]; then
@@ -489,13 +488,16 @@ if [ -n "${WINETRICKS_RUN:-}" ]; then
                 fi
             fi
 
-            # Check if packages are already installed to avoid re-installation errors
+            # Create marker directory for tracking installations
+            WINETRICKS_MARKER_DIR="$WINEPREFIX/.winetricks_markers"
+            mkdir -p "$WINETRICKS_MARKER_DIR"
+
+            # Check if packages are already installed using markers
             info "Checking for already installed packages..."
-            INSTALLED_PACKAGES=$(env WINEPREFIX="$WINEPREFIX" "$WINETRICKS" list-installed 2>/dev/null || true)
             PACKAGES_TO_INSTALL=""
 
             for pkg in $WINETRICKS_RUN; do
-                if echo "$INSTALLED_PACKAGES" | grep -q "^${pkg}$"; then
+                if [ -f "$WINETRICKS_MARKER_DIR/$pkg" ]; then
                     success "$pkg is already installed - skipping"
                 else
                     PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $pkg"
@@ -521,9 +523,24 @@ if [ -n "${WINETRICKS_RUN:-}" ]; then
                 else
                     env WINEPREFIX="$WINEPREFIX" WINETRICKS_QUIET=0 "$WINETRICKS" $PACKAGES_TO_INSTALL 2>&1 | tee "$WINETRICKS_LOGFILE" || WINETRICKS_EXIT=${PIPESTATUS[0]}
                 fi
+
+                # Check if exit code 203 (often means "already installed" for some installers)
+                if [ $WINETRICKS_EXIT -eq 203 ]; then
+                    warning "Installer returned exit code 203 (may indicate already installed)"
+                    # Mark as installed anyway since exit 203 is often a false failure
+                    for pkg in $PACKAGES_TO_INSTALL; do
+                        touch "$WINETRICKS_MARKER_DIR/$pkg"
+                        success "Marked $pkg as installed"
+                    done
+                    WINETRICKS_EXIT=0
+                fi
             fi
 
             if [ $WINETRICKS_EXIT -eq 0 ]; then
+                # Mark all successfully installed packages
+                for pkg in $PACKAGES_TO_INSTALL; do
+                    touch "$WINETRICKS_MARKER_DIR/$pkg"
+                done
                 success "Proton prefix setup complete"
             else
                 error "winetricks failed with exit code $WINETRICKS_EXIT"
@@ -559,13 +576,16 @@ progress 3 3 "Starting server"
 line BLUE
 
 # Prepare server startup logging
-SERVER_LOG="/home/container/logs/server/startup_$(date +%s).log"
-mkdir -p "$(dirname "$SERVER_LOG")"
+SERVER_LOG="$SERVER_LOG_DIR/startup_$(date +%s).log"
 
 MODIFIED_STARTUP=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 msg CYAN ":/home/container$ $MODIFIED_STARTUP"
-info "Server output log: $SERVER_LOG"
-info "Proton logs directory: $PROTON_LOG_DIR"
+line BLUE
+info "📁 Log directories:"
+info "  • Server output: $SERVER_LOG"
+info "  • Proton logs: $PROTON_LOG_DIR"
+info "  • Winetricks: $WINETRICKS_LOG_DIR"
+line BLUE
 
 # Function to find and stream game logs if they exist
 stream_game_logs() {
@@ -614,46 +634,79 @@ fi
 
 # Monitor for early crashes (first 5 seconds)
 info "Monitoring for early crashes..."
-sleep 2
+sleep 3
 if ! kill -0 $SERVER_PID 2>/dev/null; then
-    error "Server crashed within 2 seconds of startup!"
     line RED
-    msg RED "Crash Diagnosis:"
+    error "❌ Server crashed within 3 seconds of startup!"
+    line RED
 
-    # Show last lines of server log
-    if [ -f "$SERVER_LOG" ]; then
-        msg YELLOW "Last 20 lines of server output:"
-        tail -n 20 "$SERVER_LOG" | while IFS= read -r line; do
-            printf "  %s\n" "$line"
-        done
-    fi
+    # Function to show detailed crash analysis
+    show_crash_analysis() {
+        msg RED "🔍 Crash Diagnosis:"
+        echo ""
 
-    # Show Proton logs if they exist
-    if [ -d "$PROTON_LOG_DIR" ]; then
-        msg YELLOW "Proton logs available in: $PROTON_LOG_DIR"
-        latest_proton_log=$(find "$PROTON_LOG_DIR" -type f -name "*.log" -o -name "steam-*" | sort -r | head -n1)
-        if [ -n "$latest_proton_log" ]; then
-            msg YELLOW "Latest Proton log: $latest_proton_log"
-            msg YELLOW "Last 15 lines:"
-            tail -n 15 "$latest_proton_log" 2>/dev/null | while IFS= read -r line; do
-                printf "  %s\n" "$line"
-            done
+        # 1. Show last lines of server log
+        if [ -f "$SERVER_LOG" ] && [ -s "$SERVER_LOG" ]; then
+            msg YELLOW "📋 Last 30 lines of server output:"
+            tail -n 30 "$SERVER_LOG" 2>/dev/null | sed 's/^/    /' || echo "    (Could not read log)"
+            echo ""
+        else
+            msg YELLOW "⚠ Server log is empty or missing: $SERVER_LOG"
+            echo ""
         fi
-    fi
 
-    # Check for Wine crashes
-    if [ -f "${WINEPREFIX:-}/drive_c/windows/system32/crashdump.txt" ]; then
-        msg YELLOW "Wine crash dump found:"
-        cat "${WINEPREFIX}/drive_c/windows/system32/crashdump.txt" | while IFS= read -r line; do
-            printf "  %s\n" "$line"
+        # 2. Show Proton logs
+        if [ -d "$PROTON_LOG_DIR" ]; then
+            latest_proton_log=$(find "$PROTON_LOG_DIR" -type f \( -name "*.log" -o -name "steam-*" \) 2>/dev/null | xargs ls -t 2>/dev/null | head -n1)
+            if [ -n "$latest_proton_log" ] && [ -s "$latest_proton_log" ]; then
+                msg YELLOW "🍷 Latest Proton/Wine log: $(basename "$latest_proton_log")"
+                tail -n 20 "$latest_proton_log" 2>/dev/null | sed 's/^/    /' || echo "    (Could not read log)"
+                echo ""
+            else
+                msg YELLOW "⚠ No Proton logs found in: $PROTON_LOG_DIR"
+                echo ""
+            fi
+        fi
+
+        # 3. Check for Wine crash dumps
+        for crashfile in "${WINEPREFIX:-}/drive_c/windows/system32/crashdump.txt" "${WINEPREFIX:-}/*.crash" "${WINEPREFIX:-}/drive_c/*.crash"; do
+            if [ -f "$crashfile" ] && [ -s "$crashfile" ]; then
+                msg YELLOW "💥 Wine crash dump: $(basename "$crashfile")"
+                head -n 30 "$crashfile" 2>/dev/null | sed 's/^/    /' || echo "    (Could not read)"
+                echo ""
+            fi
         done
-    fi
 
-    line RED
-    info "Full logs: $SERVER_LOG"
-    info "Proton logs: $PROTON_LOG_DIR"
-    exit 1
-fi
+        # 4. Check for missing DLLs or common errors in logs
+        if [ -f "$SERVER_LOG" ]; then
+            if grep -qi "could not find\|cannot find\|missing" "$SERVER_LOG" 2>/dev/null; then
+                msg YELLOW "⚠ Possible missing dependencies detected:"
+                grep -i "could not find\|cannot find\|missing" "$SERVER_LOG" 2>/dev/null | tail -n 5 | sed 's/^/    /' || true
+                echo ""
+            fi
+            if grep -qi "error\|failed\|exception" "$SERVER_LOG" 2>/dev/null; then
+                msg YELLOW "❗ Errors found in server log:"
+                grep -i "error\|failed\|exception" "$SERVER_LOG" 2>/dev/null | tail -n 10 | sed 's/^/    /' || true
+                echo ""
+            fi
+        fi
+
+        # 5. System info that might help
+        msg YELLOW "💻 System info:"
+        echo "    WINEPREFIX: ${WINEPREFIX:-not set}"
+        echo "    WINEARCH: ${WINEARCH:-not set}"
+        echo "    PROTON_LOG: ${PROTON_LOG:-not set}"
+        echo ""
+
+        line RED
+        msg CYAN "📁 Full logs available at:"
+        info "  • Server: $SERVER_LOG"
+        info "  • Proton: $PROTON_LOG_DIR"
+        info "  • Winetricks: $WINETRICKS_LOG_DIR"
+        line RED
+    }
+
+    show_crash_analysis
 
 success "Server survived initial startup checks"
 
