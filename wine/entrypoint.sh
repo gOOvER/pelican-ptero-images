@@ -363,27 +363,14 @@ if [[ "$WINETRICKS_RUN" =~ mono ]]; then
         exit 1
     else
         MONO_URL="https://github.com/wine-mono/wine-mono/releases/download/${MONO_VERSION}/wine-mono-${MONO_VERSION#wine-mono-}-x86.msi"
-        MONO_SHA_URL="${MONO_URL}.sha256"
         rm -f "$WINEPREFIX/mono.msi"
         msg YELLOW "Downloading Wine Mono from $MONO_URL"
-        progress 1 3 "Fetching checksum..."
-        if ! MONO_SHA=$(curl -s "$MONO_SHA_URL" | awk '{print $1}' | head -c 64 2>/dev/null) || [ -z "$MONO_SHA" ]; then
-            msg YELLOW "Mono checksum not available; downloading without validation"
-            MONO_SHA=""
-        fi
+        progress 1 2 "Downloading..."
         if ! wget -q --tries=3 --timeout=30 -O "$WINEPREFIX/mono.msi" "$MONO_URL"; then
             msg RED "Failed to download Wine Mono MSI from $MONO_URL"
             exit 1
         fi
-        progress 2 3 "Validating download..."
-        if [ -n "$MONO_SHA" ]; then
-            COMPUTED_SHA=$(sha256sum "$WINEPREFIX/mono.msi" | awk '{print $1}')
-            if [ "$COMPUTED_SHA" != "$MONO_SHA" ]; then
-                msg RED "Mono checksum mismatch! Expected: $MONO_SHA, Got: $COMPUTED_SHA"
-                rm -f "$WINEPREFIX/mono.msi"
-                exit 1
-            fi
-        fi
+        progress 2 2 "Download complete"
         # install with retries and logging
         attempts=0
         max_attempts=3
