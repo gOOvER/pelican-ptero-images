@@ -707,6 +707,7 @@ if ! kill -0 $SERVER_PID 2>/dev/null; then
     }
 
     show_crash_analysis
+fi
 
 success "Server survived initial startup checks"
 
