@@ -160,6 +160,25 @@ msg YELLOW "  • Wine Version: ${RED}$WINE_VER"
 line BLUE
 
 # ----------------------------
+# NTSync - Improved synchronization (kernel >= 6.14)
+# ----------------------------
+KERNEL_VERSION=$(uname -r)
+KERNEL_MAJOR=$(echo "$KERNEL_VERSION" | cut -d. -f1)
+KERNEL_MINOR=$(echo "$KERNEL_VERSION" | cut -d. -f2)
+
+if [ "$KERNEL_MAJOR" -gt 6 ] || ([ "$KERNEL_MAJOR" -eq 6 ] && [ "$KERNEL_MINOR" -ge 14 ]); then
+    # Auto-enable NTSync if kernel >= 6.14 (unless explicitly disabled)
+    if [ "${WINE_ENABLE_NTSYNC:-1}" != "0" ]; then
+        export WINE_ENABLE_NTSYNC=1
+        success "Kernel $KERNEL_VERSION (>= 6.14) - NTSync automatically enabled"
+    else
+        warning "NTSync disabled by user (WINE_ENABLE_NTSYNC=0)"
+    fi
+else
+    warning "Kernel $KERNEL_VERSION (< 6.14) - NTSync not available"
+fi
+
+# ----------------------------
 # Environment
 # ----------------------------
 export TZ="${TZ:-UTC}"
@@ -632,7 +651,7 @@ stream_game_logs() {
                 # Find most recent log file
                 latest_log=$(find "$found_log_dir" -type f -name "*.log" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)
                 if [ -n "$latest_log" ]; then
-                    msg YELLOW "Streaming game log: $latest_log"
+                    info "Streaming game log: $latest_log"
                     tail -c0 -F "$latest_log" --pid=$SERVER_PID 2>/dev/null || true
                     return 0
                 fi
