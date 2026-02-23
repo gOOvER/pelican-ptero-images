@@ -159,24 +159,8 @@ msg YELLOW "  • Timezone: ${RED}$TIMEZONE"
 msg YELLOW "  • Wine Version: ${RED}$WINE_VER"
 line BLUE
 
-# ----------------------------
-# NTSync - Improved synchronization (kernel >= 6.14)
-# ----------------------------
-KERNEL_VERSION=$(uname -r)
-KERNEL_MAJOR=$(echo "$KERNEL_VERSION" | cut -d. -f1)
-KERNEL_MINOR=$(echo "$KERNEL_VERSION" | cut -d. -f2)
-
-if [ "$KERNEL_MAJOR" -gt 6 ] || ([ "$KERNEL_MAJOR" -eq 6 ] && [ "$KERNEL_MINOR" -ge 14 ]); then
-    # Auto-enable NTSync if kernel >= 6.14 (unless explicitly disabled)
-    if [ "${WINE_ENABLE_NTSYNC:-1}" != "0" ]; then
-        export WINE_ENABLE_NTSYNC=1
-        success "Kernel $KERNEL_VERSION (>= 6.14) - NTSync automatically enabled"
-    else
-        warning "NTSync disabled by user (WINE_ENABLE_NTSYNC=0)"
-    fi
-else
-    warning "Kernel $KERNEL_VERSION (< 6.14) - NTSync not available"
-fi
+# Note: NTSync is automatically enabled by modern Wine versions (>= 8.0) on kernel >= 6.14 with CONFIG_NTSYNC
+# No manual configuration needed
 
 # ----------------------------
 # Environment
@@ -312,6 +296,14 @@ fi
 # NOTE: 64-bit is the default (WINEARCH=win64). No automatic 32-bit enforcement is performed.
 
 # ----------------------------
+# NTSync is a Wine feature, not a winetricks package - remove if present
+# ----------------------------
+if [[ "$WINETRICKS_RUN" =~ ntsync ]]; then
+    warning "NTSync is a Wine feature (not a winetricks package) - it's controlled via WINE_ENABLE_NTSYNC environment variable"
+    WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" ntsync)
+fi
+
+# ----------------------------
 # Wine Gecko Installation
 # ----------------------------
 if [[ "$WINETRICKS_RUN" =~ gecko ]]; then
@@ -376,10 +368,29 @@ if [[ "$WINETRICKS_RUN" =~ mono ]]; then
         fi
     fi
 
-    MONO_VERSION=$(curl -s https://api.github.com/repos/wine-mono/wine-mono/releases/latest | jq -r '.tag_name // empty' 2>/dev/null)
+    # Allow manual override first (useful when GitHub API is rate-limited/offline)
+    MONO_VERSION="${WINE_MONO_VERSION:-}"
     if [ -z "$MONO_VERSION" ]; then
-        msg RED "Failed to fetch latest Wine Mono version."
-        exit 1
+        MONO_API_URL="https://api.github.com/repos/wine-mono/wine-mono/releases/latest"
+        MONO_API_JSON=""
+
+        # Do not fail the whole script on transient network/API errors.
+        MONO_API_JSON=$(curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$MONO_API_URL" 2>/dev/null || true)
+
+        if [ -n "$MONO_API_JSON" ]; then
+            if command -v jq >/dev/null 2>&1; then
+                MONO_VERSION=$(printf '%s' "$MONO_API_JSON" | jq -r '.tag_name // empty' 2>/dev/null || true)
+            else
+                # Fallback parser if jq is unavailable
+                MONO_VERSION=$(printf '%s\n' "$MONO_API_JSON" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+            fi
+        fi
+    fi
+
+    if [ -z "$MONO_VERSION" ]; then
+        warning "Could not determine latest Wine Mono version (GitHub API/network issue)."
+        info "Set WINE_MONO_VERSION (e.g. wine-mono-9.x.x) to force installation, or continue without mono."
+        WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" mono)
     else
         MONO_URL="https://github.com/wine-mono/wine-mono/releases/download/${MONO_VERSION}/wine-mono-${MONO_VERSION#wine-mono-}-x86.msi"
         rm -f "$WINEPREFIX/mono.msi"
@@ -410,8 +421,8 @@ if [[ "$WINETRICKS_RUN" =~ mono ]]; then
             msg RED "Wine Mono installation failed after $max_attempts attempts. See $WINEPREFIX/mono_install.log"
             exit 1
         fi
+        WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" mono)
     fi
-    WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" mono)
 fi
 
 # ----------------------------

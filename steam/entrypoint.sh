@@ -70,6 +70,21 @@ line() {
     esac
     printf "%b\n" "${COLOR}${sep}${NC}"
 }
+
+# Helper: remove a token (word) from a space-separated list variable
+remove_token_from_list() {
+    local var_value="$1"
+    local token="$2"
+    local out=""
+    read -r -a parts <<<"$var_value"
+    for p in "${parts[@]}"; do
+        if [ "$p" != "$token" ]; then
+            out="${out}${out:+ }${p}"
+        fi
+    done
+    printf '%s' "$out"
+}
+
 # ----------------------------
 # Error trap for uncaught errors
 # Print timestamp, failing command and line number
@@ -147,23 +162,8 @@ export PROTON_CRASH_REPORT_DIR="$PROTON_LOG_DIR"
 # Disable Steam client integration for dedicated servers (faster, less resources)
 export PROTON_NO_STEAM=1
 
-# Optional: Enable NTSync for improved synchronization (requires kernel >= 6.14 with CONFIG_NTSYNC)
-# Auto-detect kernel version - enable by default if >= 6.14
-KERNEL_VERSION=$(uname -r)
-KERNEL_MAJOR=$(echo "$KERNEL_VERSION" | cut -d. -f1)
-KERNEL_MINOR=$(echo "$KERNEL_VERSION" | cut -d. -f2)
-
-if [ "$KERNEL_MAJOR" -gt 6 ] || ([ "$KERNEL_MAJOR" -eq 6 ] && [ "$KERNEL_MINOR" -ge 14 ]); then
-    # Auto-enable NTSync if kernel >= 6.14 (unless explicitly disabled)
-    if [ "${PROTON_ENABLE_NTSYNC:-1}" != "0" ]; then
-        export PROTON_ENABLE_NTSYNC=1
-        success "Kernel $KERNEL_VERSION (>= 6.14) - NTSync automatically enabled"
-    else
-        warning "NTSync disabled by user (PROTON_ENABLE_NTSYNC=0)"
-    fi
-else
-    warning "Kernel $KERNEL_VERSION (< 6.14) - NTSync not available"
-fi
+# Note: NTSync is automatically enabled by modern Wine versions (>= 8.0) on kernel >= 6.14 with CONFIG_NTSYNC
+# No manual configuration needed
 
 # Enable Proton-GE's protonfixes system for automatic game-specific fixes (enabled by default)
 # Set PROTON_USE_PROTONFIXES=0 in your container configuration to disable
@@ -397,11 +397,19 @@ else
     line BLUE
 fi
 
-is_valid_steam_dir() {
+# is_valid_steam_dir() {
     # Simplified Steam dir validation
     local dir="$1"
     [ -d "$dir/steamapps" ] || [ -d "$dir/SteamApps" ] || [ -d "$dir/compatibilitytools.d" ]
 }
+
+# ----------------------------
+# NTSync is a Wine feature, not a winetricks package - remove if present
+# ----------------------------
+if [[ "${WINETRICKS_RUN:-}" =~ ntsync ]]; then
+    warning "NTSync is a Wine feature (not a winetricks package) - it's controlled via PROTON_ENABLE_NTSYNC environment variable"
+    WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" ntsync)
+fi
 
 # ----------------------------
 # Winetricks runtime installation (into the per-app WINEPREFIX)
