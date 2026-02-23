@@ -5,4 +5,5 @@ LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-p
 LABEL       org.opencontainers.image.description="Docker image for Pelican, Jexactyl & Pterodactyl"
 LABEL       org.opencontainers.image.licenses=AGPL-3.0-or-later
 
-RUN         apk add --update --no-cache ca-certificates curl unzip tar git jq wget
+RUN         apk upgrade --no-cache \
+			&& apk add --no-cache ca-certificates curl unzip tar git jq wget
