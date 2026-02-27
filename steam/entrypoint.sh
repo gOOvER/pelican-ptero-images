@@ -7,12 +7,12 @@ ERROR_LOG="install_error.log"
 # ----------------------------
 # Colors via tput
 # ----------------------------
-RED=$(tput setaf 1)
-GREEN=$(tput setaf 2)
-YELLOW=$(tput setaf 3)
-BLUE=$(tput setaf 4)
-CYAN=$(tput setaf 6)
-NC=$(tput sgr0)
+RED=$(tput setaf 1 2>/dev/null || printf '\033[0;31m')
+GREEN=$(tput setaf 2 2>/dev/null || printf '\033[0;32m')
+YELLOW=$(tput setaf 3 2>/dev/null || printf '\033[0;33m')
+BLUE=$(tput setaf 4 2>/dev/null || printf '\033[0;34m')
+CYAN=$(tput setaf 6 2>/dev/null || printf '\033[0;36m')
+NC=$(tput sgr0 2>/dev/null || printf '\033[0m')
 
 # ----------------------------
 # Functions
@@ -198,10 +198,6 @@ fi
 
 # Secondary console output fixes (optional, enable via environment variable)
 if [ "${WINE_CONSOLE_OUTPUT_FIX:-1}" = "1" ]; then
-    # Prevent Wine from suppressing GDI output which can affect console rendering
-    export WINE_NO_GDI="${WINE_NO_GDI:-0}"
-    export WINE_NO_COLOR_BITMAP="${WINE_NO_COLOR_BITMAP:-0}"
-
     # Enable more verbose Proton logging to ensure console output
     if [ "${PROTON_VERBOSITY:-}" = "" ]; then
         export PROTON_VERBOSITY=2
@@ -211,7 +207,6 @@ fi
 
 # Allow override for console debugging (less common, for advanced users)
 # Set WINE_NOCRASHDIALOG=1 and WINE_MONO_TRACE=all if crashes need capturing
-: # Placeholder for potential advanced debugging options
 
 # Ensure a sane XDG_RUNTIME_DIR for services that rely on it
 if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
@@ -226,12 +221,12 @@ HOME=${HOME:-/home/container}
 if [ -n "${STEAM_APPID:-}" ]; then
     # Ensure all Steam/Proton directories live under /home/container/Steam
     # Create canonical steam directory and compatdata path
-	mkdir -p /home/container/Steam
+    mkdir -p /home/container/Steam
     mkdir -p "/home/container/Steam/steamapps/compatdata/${STEAM_APPID}"
     mkdir -p /home/container/Steam/compatibilitytools.d
 
-	export STEAM_DIR="/home/container/Steam"
-	export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIR"
+    export STEAM_DIR="/home/container/Steam"
+    export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIR"
     export STEAM_COMPAT_DATA_PATH="$STEAM_COMPAT_CLIENT_INSTALL_PATH/steamapps/compatdata/${STEAM_APPID}"
     export WINETRICKS="/usr/sbin/winetricks"
 
@@ -361,6 +356,7 @@ if [ "${AUTO_UPDATE:-}" = "1" ]; then
 
         if [ ! -x ./steamcmd/steamcmd.sh ]; then
             msg RED "steamcmd not found or not executable at ./steamcmd/steamcmd.sh"
+            exit 1
         else
             # Build steamcmd arguments safely
             sc_args=( +force_install_dir /home/container +login "$STEAM_USER" "${STEAM_PASS:-}" "${STEAM_AUTH:-}" )
@@ -396,12 +392,6 @@ else
     info "Auto Update disabled - skipping server files update"
     line BLUE
 fi
-
-# is_valid_steam_dir() {
-    # Simplified Steam dir validation
-    local dir="$1"
-    [ -d "$dir/steamapps" ] || [ -d "$dir/SteamApps" ] || [ -d "$dir/compatibilitytools.d" ]
-}
 
 # ----------------------------
 # NTSync is a Wine feature, not a winetricks package - remove if present
@@ -612,7 +602,7 @@ stream_game_logs() {
                 latest_log=$(find "$found_log_dir" -type f -name "*.log" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)
                 if [ -n "$latest_log" ]; then
                     info "Streaming game log: $latest_log"
-                    tail -c0 -F "$latest_log" --pid=$SERVER_PID 2>/dev/null || true
+                    tail -c0 -F "$latest_log" --pid="$SERVER_PID" 2>/dev/null || true
                     return 0
                 fi
             fi
@@ -620,13 +610,13 @@ stream_game_logs() {
     done
 }
 
-# Execute startup command with eval for proper shell expansion
-# Only environment variables and shell operators are processed, preventing code injection
+# Execute startup command - eval is required to handle quoted args and shell operators.
+# STARTUP is set by the panel (trusted source), not directly by end-users.
 eval "$MODIFIED_STARTUP" 2>&1 | tee -a "$SERVER_LOG" &
 SERVER_PID=$!
 
 # Validate that the process was actually started
-if ! kill -0 $SERVER_PID 2>/dev/null; then
+if ! kill -0 "$SERVER_PID" 2>/dev/null; then
     error "Failed to start server process - command may have failed immediately"
     warning "Check logs: $SERVER_LOG"
     exit 1
@@ -643,7 +633,7 @@ fi
 # Monitor for early crashes (first 5 seconds)
 info "Monitoring for early crashes..."
 sleep 3
-if ! kill -0 $SERVER_PID 2>/dev/null; then
+if ! kill -0 "$SERVER_PID" 2>/dev/null; then
     line RED
     error "❌ Server crashed within 3 seconds of startup!"
     line RED
@@ -730,8 +720,8 @@ else
         line RED
         error "Server exited with code $SERVER_EXIT"
         msg YELLOW "Last 30 lines of output:"
-        tail -n 30 "$SERVER_LOG" 2>/dev/null | while IFS= read -r line; do
-            printf "  %s\n" "$line"
+        tail -n 30 "$SERVER_LOG" 2>/dev/null | while IFS= read -r log_line; do
+            printf "  %s\n" "$log_line"
         done
         line RED
         info "Full logs: $SERVER_LOG"
@@ -741,7 +731,7 @@ fi
 
 # Cleanup log streaming if active
 if [ -n "${LOG_PID:-}" ]; then
-    kill $LOG_PID 2>/dev/null || true
+    kill "$LOG_PID" 2>/dev/null || true
 fi
 
 exit $SERVER_EXIT
