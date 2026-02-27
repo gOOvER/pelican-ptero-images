@@ -96,10 +96,10 @@ RUN set -eux; cd /tmp; \
     mkdir -p /opt && tar -xzf proton-ge.tar.gz -C /opt; \
     PROTON_DIR=$(find /opt -maxdepth 1 -type d -name 'GE-Proton*' -print -quit); \
     [ -n "$PROTON_DIR" ] && mv "$PROTON_DIR" /opt/ProtonGE || { echo "Failed to find extracted Proton-GE directory" >&2; exit 1; }; \
-    # Register tool for Steam (compatibilitytools.d expects a folder)
-    rm -rf /usr/local/share/steam/compatibilitytools.d/ProtonGE 2>/dev/null || true; \
+    # Register tool for Steam - symlink avoids duplicating several GB
     mkdir -p /usr/local/share/steam/compatibilitytools.d; \
-    cp -a /opt/ProtonGE /usr/local/share/steam/compatibilitytools.d/ProtonGE; \
+    rm -rf /usr/local/share/steam/compatibilitytools.d/ProtonGE 2>/dev/null || true; \
+    ln -s /opt/ProtonGE /usr/local/share/steam/compatibilitytools.d/ProtonGE; \
     rm -rf /tmp/*
 
 # Proton machine-id fix
@@ -160,7 +160,7 @@ RUN set -eux; \
         '' \
         '# If we reach here, no executable was found. Report helpful diagnostics.' \
         'echo "Proton executable not found or not executable inside $PROTON_DIR" >&2' \
-        'echo "Contents (top-level):" >&2; ls -la "$PROTON_DIR" || true >&2' \
+        'echo "Contents (top-level):" >&2; ls -la "$PROTON_DIR" >&2 || true' \
         'exit 1' \
     > /usr/local/bin/proton; \
     chmod 755 /usr/local/bin/proton
@@ -174,9 +174,8 @@ USER container
 # Default stop signal
 STOPSIGNAL SIGINT
 
-# Copy entrypoint (adjust path if needed)
-ARG ENTRYPOINT_PATH=../entrypoint.sh
-COPY --chown=container:container ${ENTRYPOINT_PATH} /entrypoint.sh
+# Copy entrypoint - build context must be steam/ (one level above this Dockerfile)
+COPY --chown=container:container entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Use tini init and entrypoint script

@@ -103,7 +103,7 @@ ENV PATH="$HOME/.local/bin:$PATH"
 USER root
 RUN mkdir -p /opt/ProtonGE /usr/local/bin && cd /tmp \
     && PROTON_URL=$(curl -s https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest \
-        | grep browser_download_url | cut -d\" -f4 | grep .tar.gz) \
+        | grep browser_download_url | cut -d\" -f4 | grep '\.tar\.gz$') \
     && curl -sLOJ "$PROTON_URL" \
     && tar -xzf GE-Proton*.tar.gz -C /opt/ProtonGE --strip-components=1 \
     && rm GE-Proton*.* \
@@ -119,17 +119,16 @@ RUN wget -q -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winet
         https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks.bash-completion
 
 # -----------------------------
-# Pipx installation (kept minimal)
+# Pipx PATH setup (pipx installed via apt above)
 # -----------------------------
-RUN python3 -m pip install --break-system-packages pipx \
-    && python3 -m pip cache purge || true
+RUN python3 -m pipx ensurepath || true
 
 # -----------------------------
 # RCON CLI installation (latest, dynamisch)
 # -----------------------------
 RUN cd /tmp \
     && RCON_URL=$(curl -s https://api.github.com/repos/gorcon/rcon-cli/releases/latest \
-        | grep browser_download_url | cut -d\" -f4 | grep amd64_linux.tar.gz) \
+        | grep browser_download_url | cut -d\" -f4 | grep 'amd64_linux\.tar\.gz') \
     && curl -sLOJ "$RCON_URL" \
     && tar xvf rcon-*-amd64_linux.tar.gz \
     && mv rcon-*/rcon /usr/local/bin/ \
@@ -139,7 +138,8 @@ RUN cd /tmp \
 # Default stop signal and entrypoint
 # -----------------------------
 STOPSIGNAL SIGINT
-COPY --chown=container:container ../entrypoint.sh /entrypoint.sh
+# Copy entrypoint - build context must be steam/ (one level above this Dockerfile)
+COPY --chown=container:container entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
 CMD ["/entrypoint.sh"]
