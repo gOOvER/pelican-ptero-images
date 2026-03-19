@@ -179,7 +179,9 @@ if command -v Xvfb >/dev/null 2>&1; then
     if ! xdpyinfo -display "$DISPLAY" &>/dev/null 2>&1; then
         info "Starting Xvfb on display $DISPLAY (${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH})"
         # -ac disables access control so Wine/SDL2 can connect without Xauthority
-        Xvfb "$DISPLAY" -screen 0 "${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH}" -nolisten tcp -ac &
+        # stderr goes to log file to avoid _XSERVTransmkdir noise on non-root containers
+        Xvfb "$DISPLAY" -screen 0 "${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH}" -nolisten tcp -ac \
+            2>"$BASE_LOG_DIR/xvfb.log" &
         XVFB_PID=$!
         sleep 1
         if kill -0 "$XVFB_PID" 2>/dev/null; then
