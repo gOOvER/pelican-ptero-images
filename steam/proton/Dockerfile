@@ -174,6 +174,9 @@ RUN set -eux; \
     > /usr/local/bin/proton; \
     chmod 755 /usr/local/bin/proton
 
+# Pre-create X11 socket directory as root with sticky bit so Xvfb can run as non-root
+RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+
 # Create non-root user and set working directory
 RUN useradd -m -d /home/container -s /bin/bash container && mkdir -p /home/container && chown container:container /home/container
 ENV USER=container HOME=/home/container

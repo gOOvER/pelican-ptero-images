@@ -174,9 +174,12 @@ DISPLAY_HEIGHT="${DISPLAY_HEIGHT:-768}"
 DISPLAY_DEPTH="${DISPLAY_DEPTH:-24}"
 
 if command -v Xvfb >/dev/null 2>&1; then
+    # Ensure the X11 socket directory exists; Xvfb cannot create it as non-root
+    mkdir -p /tmp/.X11-unix 2>/dev/null || true
     if ! xdpyinfo -display "$DISPLAY" &>/dev/null 2>&1; then
         info "Starting Xvfb on display $DISPLAY (${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH})"
-        Xvfb "$DISPLAY" -screen 0 "${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH}" -nolisten tcp &
+        # -ac disables access control so Wine/SDL2 can connect without Xauthority
+        Xvfb "$DISPLAY" -screen 0 "${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH}" -nolisten tcp -ac &
         XVFB_PID=$!
         sleep 1
         if kill -0 "$XVFB_PID" 2>/dev/null; then
