@@ -43,6 +43,7 @@ RUN dpkg --add-architecture i386 && \
     tini \
     wget \
     winbind \
+    xvfb \
     lib32gcc-s1 \
     libao-common \
     libasound2 \
@@ -69,7 +70,9 @@ RUN dpkg --add-architecture i386 && \
     gstreamer1.0-x \
     gstreamer1.0-alsa \
     gstreamer1.0-gl \
-    gstreamer1.0-pulseaudio && \
+    gstreamer1.0-pulseaudio \
+    mesa-vulkan-drivers \
+    mesa-vulkan-drivers:i386 && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
 
 # Download and install Proton-GE latest release into /opt and register with Steam
@@ -119,6 +122,12 @@ RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
+
+# Virtual display for headless Proton/Wine (xalia, SDL-based apps)
+ENV DISPLAY=:99
+ENV DISPLAY_WIDTH=1024
+ENV DISPLAY_HEIGHT=768
+ENV DISPLAY_DEPTH=24
 
 # RCON CLI installation (latest release) - uses jq for reliable parsing
 RUN set -eux; cd /tmp; \

@@ -162,6 +162,51 @@ export PROTON_CRASH_REPORT_DIR="$PROTON_LOG_DIR"
 # Disable Steam client integration for dedicated servers (faster, less resources)
 export PROTON_NO_STEAM=1
 
+# ----------------------------
+# Virtual display (Xvfb) for headless servers (no GPU/monitor)
+# ----------------------------
+# Xvfb provides a virtual framebuffer so SDL/Wine/DXVK can initialize
+# without a physical display. This is required on bare-metal game servers.
+DISPLAY="${DISPLAY:-:99}"
+export DISPLAY
+DISPLAY_WIDTH="${DISPLAY_WIDTH:-1024}"
+DISPLAY_HEIGHT="${DISPLAY_HEIGHT:-768}"
+DISPLAY_DEPTH="${DISPLAY_DEPTH:-24}"
+
+if command -v Xvfb >/dev/null 2>&1; then
+    if ! xdpyinfo -display "$DISPLAY" &>/dev/null 2>&1; then
+        info "Starting Xvfb on display $DISPLAY (${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH})"
+        Xvfb "$DISPLAY" -screen 0 "${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH}" -nolisten tcp &
+        XVFB_PID=$!
+        sleep 1
+        if kill -0 "$XVFB_PID" 2>/dev/null; then
+            success "Xvfb started (PID: $XVFB_PID)"
+        else
+            warning "Xvfb failed to start - continuing anyway"
+        fi
+    else
+        info "Virtual display $DISPLAY already available"
+    fi
+else
+    warning "Xvfb not found - headless SDL/Wine apps may fail"
+fi
+
+# Force software Vulkan (lavapipe) and software OpenGL on headless servers.
+# These are no-ops when a real GPU is present; safe to set unconditionally.
+export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
+export GALLIUM_DRIVER="${GALLIUM_DRIVER:-llvmpipe}"
+# Point DXVK/Vulkan loader to the lavapipe software ICD (ships with mesa-vulkan-drivers).
+# Prefer existing VK_ICD_FILENAMES if the user has set them (e.g. real GPU passthrough).
+if [ -z "${VK_ICD_FILENAMES:-}" ]; then
+    LVP_ICD=""
+    for f in \
+        /usr/share/vulkan/icd.d/lvp_icd.x86_64.json \
+        /usr/share/vulkan/icd.d/lvp_icd.i686.json; do
+        [ -f "$f" ] && LVP_ICD="${LVP_ICD:+${LVP_ICD}:}${f}"
+    done
+    [ -n "$LVP_ICD" ] && export VK_ICD_FILENAMES="$LVP_ICD" && info "Software Vulkan ICD: $VK_ICD_FILENAMES"
+fi
+
 # Note: NTSync is automatically enabled by modern Wine versions (>= 8.0) on kernel >= 6.14 with CONFIG_NTSYNC
 # No manual configuration needed
 
