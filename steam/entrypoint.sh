@@ -210,6 +210,20 @@ if [ -z "${VK_ICD_FILENAMES:-}" ]; then
     [ -n "$LVP_ICD" ] && export VK_ICD_FILENAMES="$LVP_ICD" && info "Software Vulkan ICD: $VK_ICD_FILENAMES"
 fi
 
+# SDL2 video driver: use dummy/null backend so SDL2-based Windows tools (e.g. xalia.exe)
+# can initialize without a real display. Wine passes this env var through to Windows processes.
+# Override with SDL_VIDEODRIVER=x11 if a real X connection is needed.
+export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-dummy}"
+
+# Suppress expected headless DXVK noise (OpenVR not installed, OpenXR not installed, no EDID).
+# Keep level at "error" so real DXVK errors are still visible.
+# Set DXVK_LOG_LEVEL=info to restore full DXVK output for debugging.
+export DXVK_LOG_LEVEL="${DXVK_LOG_LEVEL:-error}"
+
+# Suppress OpenVR/OpenXR init attempts - not needed for dedicated servers.
+export PROTON_ENABLE_NVAPI="${PROTON_ENABLE_NVAPI:-0}"
+export DXVK_ENABLE_NVAPI="${DXVK_ENABLE_NVAPI:-0}"
+
 # Note: NTSync is automatically enabled by modern Wine versions (>= 8.0) on kernel >= 6.14 with CONFIG_NTSYNC
 # No manual configuration needed
 
