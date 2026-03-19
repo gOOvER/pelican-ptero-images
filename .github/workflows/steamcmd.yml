@@ -48,7 +48,7 @@ jobs:
 
       # Build and push Docker image with cache
       - name: Build and push SteamCMD image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./steamcmd
           file: "./steamcmd/${{ matrix.distro }}/Dockerfile"
