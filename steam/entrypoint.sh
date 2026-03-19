@@ -674,7 +674,16 @@ stream_game_logs() {
 
 # Execute startup command - eval is required to handle quoted args and shell operators.
 # STARTUP is set by the panel (trusted source), not directly by end-users.
-eval "$MODIFIED_STARTUP" 2>&1 | tee -a "$SERVER_LOG" &
+# Full output is captured in the log file; known harmless headless-mode noise
+# (caught Xalia SDL exceptions, DXVK EDID/colorimetry errors) is filtered from
+# the terminal so real errors remain visible. Set SUPPRESS_HEADLESS_NOISE=0 to
+# see the raw output.
+_NOISE_FILTER='readMonitorEdidFromKey|colorimetry info, using blank|EXCEPTION handling.*PlatformNotSupport|PlatformNotSupportedException.*Video driver|at Xalia\.(Sdl|Ui|Main|Gudl)'
+if [ "${SUPPRESS_HEADLESS_NOISE:-1}" = "1" ]; then
+    eval "$MODIFIED_STARTUP" 2>&1 | tee -a "$SERVER_LOG" | grep --line-buffered -v -E "$_NOISE_FILTER" &
+else
+    eval "$MODIFIED_STARTUP" 2>&1 | tee -a "$SERVER_LOG" &
+fi
 SERVER_PID=$!
 
 # Validate that the process was actually started
