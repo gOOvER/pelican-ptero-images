@@ -62,6 +62,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/goover/java:base_${{ matrix.tag }}
+            ghcr.io/goover/java:${{ matrix.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
