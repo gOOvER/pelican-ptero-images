@@ -49,6 +49,7 @@ jobs:
           file: ./custom/${{ matrix.oses }}/Dockerfile
           platforms: linux/amd64
           push: true
+          network: host
           tags: ghcr.io/goover/custom:${{ matrix.oses }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

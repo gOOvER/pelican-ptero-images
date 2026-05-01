@@ -59,6 +59,7 @@ jobs:
           file: ./dev/go/${{ matrix.tag }}/Dockerfile
           platforms: linux/amd64
           push: true
+          network: host
           tags: |
             ghcr.io/goover/go:${{ matrix.tag }}
           cache-from: type=gha

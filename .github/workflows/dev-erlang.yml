@@ -50,6 +50,7 @@ jobs:
           file: ./dev/erlang/${{ matrix.tag }}/Dockerfile
           platforms: linux/amd64
           push: true
+          network: host
           tags: |
             ghcr.io/goover/erlang:${{ matrix.tag }}
           cache-from: type=gha

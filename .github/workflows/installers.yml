@@ -54,6 +54,7 @@ jobs:
           file: ./installers/${{ matrix.tag }}/Dockerfile
           platforms: linux/amd64
           push: true
+          network: host
           tags: |
             ghcr.io/goover/installers:${{ matrix.tag }}
           cache-from: type=gha

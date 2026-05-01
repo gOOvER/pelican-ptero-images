@@ -52,6 +52,7 @@ jobs:
           file: ./database/redis/${{ matrix.tag }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          network: host
           tags: |
             ghcr.io/goover/redis:${{ matrix.tag }}
           cache-from: type=gha

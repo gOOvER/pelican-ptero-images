@@ -69,6 +69,7 @@ jobs:
           file: ./java/base/${{ matrix.tag }}/Dockerfile
           platforms: ${{ matrix.platform }}
           push: true
+          network: host
           provenance: false
           tags: ghcr.io/goover/java:${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
           cache-from: type=gha,scope=base-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}

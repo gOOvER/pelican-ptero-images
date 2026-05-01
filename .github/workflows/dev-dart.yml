@@ -51,6 +51,7 @@ jobs:
           file: ./dev/dart/${{ matrix.tag }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          network: host
           tags: |
             ghcr.io/goover/dart:${{ matrix.tag }}
           cache-from: type=gha

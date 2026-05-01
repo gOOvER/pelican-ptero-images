@@ -49,6 +49,7 @@ jobs:
           file: ./database/cassandra/${{ matrix.tag }}/Dockerfile
           platforms: linux/amd64
           push: true
+          network: host
           tags: |
             ghcr.io/goover/cassandra:${{ matrix.tag }}
           cache-from: type=gha

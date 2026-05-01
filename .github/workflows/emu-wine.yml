@@ -51,6 +51,7 @@ jobs:
           file: "./wine/Dockerfile"
           platforms: linux/amd64
           push: true
+          network: host
           tags: "ghcr.io/goover/wine:${{ matrix.tag }}"
           build-args: |
             WINE_BRANCH=${{ matrix.tag }}

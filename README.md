@@ -319,8 +319,8 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| java:shenandoah_8 | `ghcr.io/goover/java:shenandoah_8` | ✅ | ✅ |
-| java:shenandoah_11 | `ghcr.io/goover/java:shenandoah_11` | ✅ | ✅ |
+| java:shenandoah_8 | `ghcr.io/goover/java:shenandoah_8` | ✅ | ❌ |
+| java:shenandoah_11 | `ghcr.io/goover/java:shenandoah_11` | ✅ | ❌ |
 | java:shenandoah_17 | `ghcr.io/goover/java:shenandoah_17` | ✅ | ✅ |
 | java:shenandoah_21 | `ghcr.io/goover/java:shenandoah_21` | ✅ | ✅ |
 | java:shenandoah_25 | `ghcr.io/goover/java:shenandoah_25` | ✅ | ✅ |

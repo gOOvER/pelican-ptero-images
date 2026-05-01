@@ -49,6 +49,7 @@ jobs:
           file: ./distros/archlinux/${{ matrix.oses }}/Dockerfile
           platforms: linux/amd64
           push: true
+          network: host
           tags: |
             ghcr.io/goover/archlinux:${{ matrix.oses }}
           cache-from: type=gha

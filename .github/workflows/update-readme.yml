@@ -59,6 +59,48 @@ jobs:
             [ -d "$1" ]
           }
 
+          # Function to get arm64-excluded tags from a workflow YAML (one tag per line)
+          get_arm64_excluded_tags() {
+            local workflow="$1"
+            [ ! -f "$workflow" ] && echo "" && return
+            python3 - "$workflow" <<'PYEOF'
+import sys, yaml
+try:
+    with open(sys.argv[1]) as f:
+        data = yaml.safe_load(f)
+    for job in data.get('jobs', {}).values():
+        matrix = job.get('strategy', {}).get('matrix', {})
+        for exc in matrix.get('exclude', []):
+            if exc.get('platform') == 'linux/arm64':
+                print(exc.get('tag'))
+except Exception:
+    pass
+PYEOF
+          }
+
+          # Function to check if a tag appears in a newline-separated excluded-tags list
+          is_arm64_excluded() {
+            echo "$1" | grep -qxF "$2"
+          }
+
+          # Function to update the ARM64 column for an existing README entry
+          update_arm64_column() {
+            local image_name="$1"
+            local arm64_flag="$2"
+            python3 - README.md "$image_name" "$arm64_flag" <<'PYEOF'
+import sys, re
+readme, image, arm64 = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(readme, encoding='utf-8') as f:
+    content = f.read()
+pattern = r'(\| ' + re.escape(image) + r' \| `[^`]+` \| (?:\u2705|\u274c) \| )(?:\u2705|\u274c)( \|)'
+new_content = re.sub(pattern, r'\g<1>' + arm64 + r'\g<2>', content)
+if new_content != content:
+    with open(readme, 'w', encoding='utf-8') as f:
+        f.write(new_content)
+    print(f"  \U0001f504 {image} \u2192 ARM64: {arm64}")
+PYEOF
+          }
+
           CHANGES_MADE=""
 
           # ============================================
@@ -278,12 +320,18 @@ jobs:
           # Check Java Shenandoah versions
           # ============================================
           echo "📦 Checking Java Shenandoah..."
+          shenandoah_excluded=$(get_arm64_excluded_tags ".github/workflows/java-shenandoah.yml")
           for v in $(get_versions "java/shenandoah"); do
             if ! check_image "java:shenandoah_$v "; then
               echo "  ➕ Adding java:shenandoah_$v"
               last_shenandoah=$(grep -n "| java:shenandoah_" README.md | tail -1 | cut -d: -f1)
               if [ -n "$last_shenandoah" ]; then
-                sed -i "${last_shenandoah}a\\| java:shenandoah_$v | \`ghcr.io/goover/java:shenandoah_$v\` | ✅ | ✅ |" README.md
+                if is_arm64_excluded "$shenandoah_excluded" "$v"; then
+                  arm64_status="❌"
+                else
+                  arm64_status="✅"
+                fi
+                sed -i "${last_shenandoah}a\\| java:shenandoah_$v | \`ghcr.io/goover/java:shenandoah_$v\` | ✅ | ${arm64_status} |" README.md
                 CHANGES_MADE="${CHANGES_MADE}Added Java Shenandoah: $v\n"
               fi
             fi
@@ -366,6 +414,46 @@ jobs:
                 CHANGES_MADE="${CHANGES_MADE}Added Bots: $bot\n"
               fi
             fi
+          done
+
+          # ============================================
+          # UPDATE ARM64 STATUS FOR EXISTING ENTRIES
+          # Reads each workflow's exclude list and syncs
+          # the ARM64 column in the README accordingly.
+          # ============================================
+          echo ""
+          echo "🔄 Syncing ARM64 status for existing entries..."
+
+          declare -A JAVA_WORKFLOWS=(
+            ["base"]=".github/workflows/java-base.yml"
+            ["shenandoah"]=".github/workflows/java-shenandoah.yml"
+            ["corretto"]=".github/workflows/java-corretto.yml"
+            ["zulu"]=".github/workflows/java-zulu.yml"
+            ["liberica"]=".github/workflows/java-liberica.yml"
+            ["dragonwell"]=".github/workflows/java-dragonwell.yml"
+            ["graalvm"]=".github/workflows/java-graalvm.yml"
+          )
+
+          for variant in "${!JAVA_WORKFLOWS[@]}"; do
+            workflow="${JAVA_WORKFLOWS[$variant]}"
+            excluded=$(get_arm64_excluded_tags "$workflow")
+            for v in $(get_versions "java/$variant"); do
+              if [ "$variant" = "base" ]; then
+                image="java:$v"
+              else
+                image="java:${variant}_$v"
+              fi
+              if is_arm64_excluded "$excluded" "$v"; then
+                arm64_flag="❌"
+              else
+                arm64_flag="✅"
+              fi
+              result=$(update_arm64_column "$image" "$arm64_flag")
+              if [ -n "$result" ]; then
+                echo "$result"
+                CHANGES_MADE="${CHANGES_MADE}Updated ARM64 for $image: $arm64_flag\n"
+              fi
+            done
           done
 
           # Output result

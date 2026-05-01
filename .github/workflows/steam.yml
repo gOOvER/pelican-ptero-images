@@ -49,6 +49,7 @@ jobs:
           file: ./steam/${{ matrix.distro }}/Dockerfile
           platforms: linux/amd64
           push: true
+          network: host
           tags: ghcr.io/goover/steam:${{ matrix.distro }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

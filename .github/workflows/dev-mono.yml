@@ -48,6 +48,7 @@ jobs:
           file: ./dev/mono/${{ matrix.tag }}/Dockerfile
           platforms: linux/amd64
           push: true
+          network: host
           tags: |
             ghcr.io/goover/mono:${{ matrix.tag }}
           cache-from: type=gha

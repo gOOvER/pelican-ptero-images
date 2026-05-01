@@ -69,6 +69,7 @@ jobs:
           file: ./java/graalvm/${{ matrix.tag }}/Dockerfile
           platforms: ${{ matrix.platform }}
           push: true
+          network: host
           provenance: false
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:graalvm_${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
           labels: |

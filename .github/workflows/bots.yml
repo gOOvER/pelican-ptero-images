@@ -60,6 +60,7 @@ jobs:
           file: ./bots/${{ matrix.tag }}/Dockerfile
           platforms: linux/amd64
           push: true
+          network: host
           tags: |
             ghcr.io/${{ steps.vars.outputs.owner }}/bots:${{ matrix.tag }}
             ghcr.io/${{ steps.vars.outputs.owner }}/bots:${{ matrix.tag }}-${{ github.sha }}

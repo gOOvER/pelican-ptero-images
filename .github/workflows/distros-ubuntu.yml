@@ -53,6 +53,7 @@ jobs:
           file: ./distros/ubuntu/${{ matrix.oses }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          network: host
           tags: |
             ghcr.io/goover/ubuntu:${{ matrix.oses }}
           cache-from: type=gha

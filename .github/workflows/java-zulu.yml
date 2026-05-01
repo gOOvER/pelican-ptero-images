@@ -71,6 +71,7 @@ jobs:
           file: ./java/zulu/${{ matrix.tag }}/Dockerfile
           platforms: ${{ matrix.platform }}
           push: true
+          network: host
           provenance: false
           tags: ghcr.io/goover/java:zulu_${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
           cache-from: type=gha,scope=zulu-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}

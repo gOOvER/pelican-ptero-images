@@ -70,6 +70,7 @@ jobs:
           file: ./dev/dotnet/${{ matrix.tag }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          network: host
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

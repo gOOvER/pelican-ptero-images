@@ -68,6 +68,7 @@ jobs:
           file: ./games/${{ matrix.game }}/Dockerfile
           platforms: ${{ matrix.game == 'hytale' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: true
+          network: host
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/games:${{ matrix.game }}
             ghcr.io/${{ steps.owner.outputs.owner }}/games:${{ matrix.game }}-${{ github.sha }}
