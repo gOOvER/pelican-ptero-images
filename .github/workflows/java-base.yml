@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    name: "java:base_${{ matrix.tag }} (${{ matrix.platform }})"
+    name: "java:${{ matrix.tag }} (${{ matrix.platform }})"
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -77,7 +77,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=base-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
 
   merge:
-    name: "java:base_${{ matrix.tag }} (manifest)"
+    name: "java:${{ matrix.tag }} (manifest)"
     needs: build
     runs-on: ubuntu-latest
     strategy:
