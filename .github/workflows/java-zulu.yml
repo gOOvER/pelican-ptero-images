@@ -20,8 +20,65 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  push:
-    name: "java:zulu_${{ matrix.tag }}"
+  build:
+    name: "java:zulu_${{ matrix.tag }} (${{ matrix.platform }})"
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        tag:
+          - 8
+          - 11
+          - 13
+          - 15
+          - 17
+          - 18
+          - 19
+          - 20
+          - 21
+          - 22
+          - 23
+          - 24
+          - 25
+        platform:
+          - linux/amd64
+          - linux/arm64
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare platform tag
+        id: prep
+        run: echo "platform_tag=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./java/zulu
+          file: ./java/zulu/${{ matrix.tag }}/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          provenance: false
+          tags: ghcr.io/goover/java:zulu_${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          cache-from: type=gha,scope=zulu-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          cache-to: type=gha,mode=max,scope=zulu-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+
+  merge:
+    name: "java:zulu_${{ matrix.tag }} (manifest)"
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -42,29 +99,15 @@ jobs:
           - 25
 
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-        with:
-          buildkitd-flags: --debug
-
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v7
-        with:
-          context: ./java/zulu
-          file: ./java/zulu/${{ matrix.tag }}/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/goover/java:zulu_${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/goover/java:zulu_${{ matrix.tag }} \
+            ghcr.io/goover/java:zulu_${{ matrix.tag }}-linux-amd64 \
+            ghcr.io/goover/java:zulu_${{ matrix.tag }}-linux-arm64

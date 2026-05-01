@@ -5,6 +5,8 @@ LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-p
 LABEL       org.opencontainers.image.licenses=AGPL-3.0-or-later
 LABEL       org.opencontainers.image.description="Docker image for Pelican Hosting Panel and Pterodactyl"
 
+ENV         DEBIAN_FRONTEND=noninteractive
+
 RUN 		apt-get update \
 			&& apt-get upgrade -y \
 			&& apt-get install -y --no-install-recommends \

@@ -6,6 +6,8 @@ LABEL       org.opencontainers.image.description="Docker image for Pelican Hosti
 LABEL       org.opencontainers.image.licenses=AGPL-3.0-or-later
 
 
+ENV         DEBIAN_FRONTEND=noninteractive
+
 RUN 		apt-get update \
 			&& apt-get upgrade -y \
 			&& apt-get install -y --no-install-recommends \

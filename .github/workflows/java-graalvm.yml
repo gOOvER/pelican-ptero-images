@@ -19,8 +19,68 @@ env:
   IMAGE_NAME: goover/java
 
 jobs:
-  push:
-    name: "java:graalvm_${{ matrix.tag }}"
+  build:
+    name: "java:graalvm_${{ matrix.tag }} (${{ matrix.platform }})"
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        tag:
+          - 17
+          - 20
+          - 21
+          - 22
+          - 23
+          - 25
+        platform:
+          - linux/amd64
+          - linux/arm64
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare platform tag
+        id: prep
+        run: echo "platform_tag=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: ./java/graalvm
+          file: ./java/graalvm/${{ matrix.tag }}/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          provenance: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:graalvm_${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          labels: |
+            org.opencontainers.image.title=Java GraalVM ${{ matrix.tag }}
+            org.opencontainers.image.description=GraalVM JDK ${{ matrix.tag }} for Pelican/Pterodactyl
+            org.opencontainers.image.vendor=gOOvER
+          cache-from: type=gha,scope=graalvm-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          cache-to: type=gha,mode=max,scope=graalvm-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+
+  merge:
+    name: "java:graalvm_${{ matrix.tag }} (manifest)"
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -37,15 +97,6 @@ jobs:
           - 25
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
         with:
@@ -53,27 +104,9 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=graalvm_${{ matrix.tag }}
-          labels: |
-            org.opencontainers.image.title=Java GraalVM ${{ matrix.tag }}
-            org.opencontainers.image.description=GraalVM JDK ${{ matrix.tag }} for Pelican/Pterodactyl
-            org.opencontainers.image.vendor=gOOvER
-
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          context: ./java/graalvm
-          file: ./java/graalvm/${{ matrix.tag }}/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: false
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:graalvm_${{ matrix.tag }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:graalvm_${{ matrix.tag }}-linux-amd64 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:graalvm_${{ matrix.tag }}-linux-arm64

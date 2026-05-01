@@ -1,8 +1,10 @@
-FROM        --platform=$TARGETOS/$TARGETARCH shipilev/openjdk:25
+FROM        --platform=$TARGETOS/$TARGETARCH eclipse-temurin:25-jdk-noble
 
 LABEL   	author="Torsten Widmann" maintainer="info@goover.de"
 LABEL   	org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"
 LABEL   	org.opencontainers.image.licenses=MIT
+
+ENV         DEBIAN_FRONTEND=noninteractive
 
 RUN 		apt-get update \
 			&& apt-get upgrade -y \
