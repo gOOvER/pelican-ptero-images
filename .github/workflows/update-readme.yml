@@ -63,19 +63,7 @@ jobs:
           get_arm64_excluded_tags() {
             local workflow="$1"
             [ ! -f "$workflow" ] && echo "" && return
-            python3 - "$workflow" <<'PYEOF'
-import sys, yaml
-try:
-    with open(sys.argv[1]) as f:
-        data = yaml.safe_load(f)
-    for job in data.get('jobs', {}).values():
-        matrix = job.get('strategy', {}).get('matrix', {})
-        for exc in matrix.get('exclude', []):
-            if exc.get('platform') == 'linux/arm64':
-                print(exc.get('tag'))
-except Exception:
-    pass
-PYEOF
+            python3 .github/scripts/get_arm64_excluded_tags.py "$workflow" 2>/dev/null || true
           }
 
           # Function to check if a tag appears in a newline-separated excluded-tags list
@@ -87,18 +75,7 @@ PYEOF
           update_arm64_column() {
             local image_name="$1"
             local arm64_flag="$2"
-            python3 - README.md "$image_name" "$arm64_flag" <<'PYEOF'
-import sys, re
-readme, image, arm64 = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(readme, encoding='utf-8') as f:
-    content = f.read()
-pattern = r'(\| ' + re.escape(image) + r' \| `[^`]+` \| (?:\u2705|\u274c) \| )(?:\u2705|\u274c)( \|)'
-new_content = re.sub(pattern, r'\g<1>' + arm64 + r'\g<2>', content)
-if new_content != content:
-    with open(readme, 'w', encoding='utf-8') as f:
-        f.write(new_content)
-    print(f"  \U0001f504 {image} \u2192 ARM64: {arm64}")
-PYEOF
+            python3 .github/scripts/update_arm64_column.py README.md "$image_name" "$arm64_flag"
           }
 
           CHANGES_MADE=""
