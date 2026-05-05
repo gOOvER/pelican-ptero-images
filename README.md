@@ -91,6 +91,7 @@ periodically to ensure dependencies are always up-to-date.
 | python:3.11 | `ghcr.io/goover/python:3.11` | ✅ | ✅ |
 | python:3.12 | `ghcr.io/goover/python:3.12` | ✅ | ✅ |
 | python:3.13 | `ghcr.io/goover/python:3.13` | ✅ | ✅ |
+| python:3.14 | `ghcr.io/goover/python:3.14` | ✅ | ✅ |
 
 ---
 
@@ -337,13 +338,10 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| mariadb:10.4 | `ghcr.io/goover/mariadb:10.4` | ✅ | ✅ |
-| mariadb:10.5 | `ghcr.io/goover/mariadb:10.5` | ✅ | ✅ |
 | mariadb:10.6 | `ghcr.io/goover/mariadb:10.6` | ✅ | ✅ |
-| mariadb:10.10 | `ghcr.io/goover/mariadb:10.10` | ✅ | ✅ |
 | mariadb:10.11 | `ghcr.io/goover/mariadb:10.11` | ✅ | ✅ |
-| mariadb:11.0 | `ghcr.io/goover/mariadb:11.0` | ✅ | ✅ |
-| mariadb:11.1 | `ghcr.io/goover/mariadb:11.1` | ✅ | ✅ |
+| mariadb:11.4 | `ghcr.io/goover/mariadb:11.4` | ✅ | ✅ |
+| mariadb:12.2 | `ghcr.io/goover/mariadb:12.2` | ✅ | ✅ |
 
 ---
 
