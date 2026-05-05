@@ -17,8 +17,6 @@ RUN 		apt-get update \
                     curl \
                     dbus \
                     dirmngr \
-                    aspnetcore-runtime-8.0 \
-                    dotnet-sdk-8.0 \
                     g++ \
                     gcc \
                     gdb \
@@ -65,7 +63,7 @@ RUN 		apt-get update \
                     libgcc1 \
                     libgdiplus \
                     libgtk2.0-0:i386 \
-                    libicu74 \
+                    libicu78 \
                     libnss3 \
                     libpangocairo-1.0-0 \
                     libpulse-dev \
@@ -88,6 +86,16 @@ RUN 		apt-get update \
                     libxss1 \
                     libxtst6 && \
 			rm -rf /var/lib/apt/lists/*
+
+## install .NET 8 runtime + SDK via dotnet-install.sh (Ubuntu 26.04 repo does not ship .NET 8)
+RUN         wget -q https://dot.net/v1/dotnet-install.sh -O /tmp/dotnet-install.sh \
+            && chmod +x /tmp/dotnet-install.sh \
+            && /tmp/dotnet-install.sh --channel LTS --install-dir /usr/share/dotnet \
+            && /tmp/dotnet-install.sh --channel LTS --runtime aspnetcore --install-dir /usr/share/dotnet \
+            && ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet \
+            && rm -f /tmp/dotnet-install.sh
+
+ENV         DOTNET_ROOT=/usr/share/dotnet
 
 ## install rcon
 RUN         cd /tmp/ \
