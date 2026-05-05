@@ -1,4 +1,4 @@
-FROM        --platform=$TARGETOS/$TARGETARCH python:3.13-slim
+FROM        --platform=$TARGETOS/$TARGETARCH python:3.14-slim
 
 LABEL       org.opencontainers.image.authors="Torsten Widmann - gOOvER - info@goover.de"
 LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"

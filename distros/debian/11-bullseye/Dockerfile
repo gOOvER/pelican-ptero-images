@@ -13,6 +13,7 @@ RUN     	apt update \
 
 ## Install dependencies
 RUN     	apt install -y \
+            	nala \
             	apt-transport-https \
             	binutils \
             	ca-certificates \

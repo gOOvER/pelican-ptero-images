@@ -19,6 +19,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN dpkg --add-architecture i386 && \
     apt-get update && apt-get -y upgrade && \
     apt-get install -y --no-install-recommends \
+    nala \
     alsa-tools \
     ca-certificates \
     cabextract \

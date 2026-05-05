@@ -10,6 +10,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Install required system packages and clean up afterwards to reduce image size
 RUN apt-get update && apt-get -y upgrade && \
     apt-get install -y --no-install-recommends \
+        nala \
         autoconf \
         automake \
         build-essential \

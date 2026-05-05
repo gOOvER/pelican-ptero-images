@@ -12,6 +12,7 @@ RUN             apt update \
 
 ## install dependencies
 RUN             apt install -y \
+                        nala \
                         apt-transport-https \
                         binutils \
                         bzip2 \

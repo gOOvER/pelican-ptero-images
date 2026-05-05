@@ -9,6 +9,7 @@ ARG         DEBIAN_FRONTEND=noninteractive
 RUN 		apt-get update \
 			&& apt-get upgrade -y \
 			&& apt-get install -y --no-install-recommends \
+                nala \
                 apt-transport-https \
                 apt-utils \
                 ca-certificates \
@@ -34,6 +35,7 @@ RUN         wget -O - https://apt.corretto.aws/corretto.key | gpg --dearmor -o /
 			&& echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" | tee /etc/apt/sources.list.d/corretto.list \
 			&& apt-get update \
 			&& apt-get install -y --no-install-recommends java-1.8.0-amazon-corretto-jdk \
+			nala \
 			&& apt-get clean \
 			&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 

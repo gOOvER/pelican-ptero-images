@@ -13,6 +13,7 @@ RUN         apt update \
 
 ## install dependencies
 RUN   apt install -y iproute2 \
+        nala \
         curl \
         git \
         zip \

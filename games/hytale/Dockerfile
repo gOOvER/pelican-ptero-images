@@ -6,6 +6,7 @@ LABEL       org.opencontainers.image.authors="Michael Parker <parker@pelican.dev
 
 RUN         apt update -y \
             && apt install -y \
+                nala \
                 curl \
                 wget \
                 lsof \

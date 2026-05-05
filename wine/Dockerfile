@@ -13,6 +13,7 @@ RUN dpkg --add-architecture i386 && \
     apt update && \
     apt -y upgrade && \
     apt install -y --no-install-recommends \
+        nala \
         apt-transport-https \
         binutils \
         ca-certificates \
@@ -81,6 +82,7 @@ RUN mkdir -pm755 /etc/apt/keyrings && \
     wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/trixie/winehq-trixie.sources && \
     apt update && \
     apt install -y --no-install-recommends winehq-${WINE_BRANCH} cabextract && \
+    nala \
     apt clean && \
     rm -rf /var/lib/apt/lists/* && \
     wget -q -O /usr/sbin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks && \

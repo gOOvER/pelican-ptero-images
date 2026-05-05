@@ -17,6 +17,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN dpkg --add-architecture i386 \
     && apt update && apt -y upgrade \
     && apt install -y --no-install-recommends \
+        nala \
         ca-certificates \
         curl \
         file \

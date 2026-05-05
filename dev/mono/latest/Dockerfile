@@ -11,6 +11,7 @@ RUN         	dpkg --add-architecture i386
 RUN 		apt-get update \
 			&& apt-get upgrade -y \
 			&& apt-get install -y --no-install-recommends \
+					nala \
 					ca-certificates \
                     curl \
                     dbus \
@@ -99,6 +100,7 @@ RUN         	apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3
 RUN        		sh -c 'echo "deb https://download.mono-project.com/repo/debian stable-buster main" > /etc/apt/sources.list.d/mono-official-stable.list'
 RUN         	apt update
 RUN         	apt install -y \
+                	nala \
                 	mono-complete
 
 # Set the locale

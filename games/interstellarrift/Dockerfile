@@ -12,6 +12,7 @@ RUN     	dpkg --add-architecture i386
 RUN     	apt update
 RUN     	apt -y upgrade
 RUN     	apt install -y \
+            	nala \
             	gnupg2 \
 				locales \
             	software-properties-common \

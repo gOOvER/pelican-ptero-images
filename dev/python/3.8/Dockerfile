@@ -15,6 +15,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Install system dependencies and upgrade pip
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        nala \
         ca-certificates \
         curl \
         default-libmysqlclient-dev \

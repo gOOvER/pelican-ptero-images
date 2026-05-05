@@ -11,6 +11,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     # Skip upgrade in container builds to save time
     apt-get install -y --no-install-recommends \
+        nala \
         ca-certificates \
         curl \
         dnsutils \
@@ -36,6 +37,7 @@ RUN apt-get update && \
         libsqlite3-dev \
     # temporäre Build-Tools für Node/Yarn
     && apt-get install -y --no-install-recommends \
+        nala \
         autoconf \
         automake \
         build-essential \
@@ -54,6 +56,7 @@ RUN apt-get update && \
     && echo "deb [signed-by=/etc/apt/keyrings/yarn.gpg] https://dl.yarnpkg.com/debian stable main" \
          > /etc/apt/sources.list.d/yarn.list \
     && apt-get update && apt-get install -y nodejs yarn \
+    nala \
     # NPM + Essential packages (minimal installation)
     && npm install -g npm@latest --no-audit --no-fund --silent \
     && npm install -g corepack@latest --no-audit --no-fund --silent \

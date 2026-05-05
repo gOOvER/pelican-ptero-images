@@ -11,7 +11,7 @@ RUN       apt update \
           &&   apt upgrade -y
 
 ##    install dependencies
-RUN   apt install -y ffmpeg curl python3 iproute2 libjemalloc2
+RUN   apt install -y nala ffmpeg curl python3 iproute2 libjemalloc2
 
 # Install latest youtube-dl
 RUN   curl -L https://yt-dl.org/downloads/latest/youtube-dl -o /usr/local/bin/youtube-dl

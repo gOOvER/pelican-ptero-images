@@ -11,6 +11,7 @@ RUN dpkg --add-architecture i386; \
     apt-get update; \
     apt-get -y upgrade; \
     apt-get install -y --no-install-recommends \
+            nala \
             ca-certificates \
             curl \
             dbus \

@@ -12,6 +12,7 @@ RUN         bash -lc 'set -euo pipefail; \
     apt-get update; \
     apt-get -y upgrade; \
     apt-get install -y --no-install-recommends' \
+            nala \
             ca-certificates \
             curl \
             dbus \
@@ -116,6 +117,7 @@ RUN         cd /tmp/; \
 
 ## install mono official repo and packages
 RUN apt-get update && apt-get install -y --no-install-recommends dirmngr ca-certificates gnupg; \
+    nala \
     mkdir -p /usr/share/keyrings; \
     gpg --homedir /tmp --no-default-keyring --keyring /tmp/mono-temp-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF; \
     gpg --homedir /tmp --no-default-keyring --keyring /tmp/mono-temp-keyring.gpg --export --output /usr/share/keyrings/mono-official-archive-keyring.gpg; \
@@ -123,6 +125,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends dirmngr ca-cert
     echo "deb [signed-by=/usr/share/keyrings/mono-official-archive-keyring.gpg] https://download.mono-project.com/repo/debian stable-buster main" > /etc/apt/sources.list.d/mono-official-stable.list; \
     apt-get update; \
     apt-get install -y --no-install-recommends mono-complete; \
+    nala \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/* /tmp/*'
 
