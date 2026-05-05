@@ -1,4 +1,4 @@
-FROM        ubuntu:24.04
+FROM        ubuntu:26.04
 
 LABEL       org.opencontainers.image.authors="Torsten Widmann - gOOvER - info@goover.de"
 LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"
@@ -11,9 +11,7 @@ RUN        	dpkg --add-architecture i386
 RUN 		apt-get update \
 			&& apt-get upgrade -y \
 			&& apt-get install -y --no-install-recommends \
---no-install-recommends \
-			&& apt-get clean \
-			&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+				nala \
 				build-essential \
 				ca-certificates \
 				curl \
@@ -32,7 +30,9 @@ RUN 		apt-get update \
 				lib32gcc-s1 \
 				libcurl4 \
 				libcurl4-gnutls-dev \
-				libsdl2-2.0-0
+				libsdl2-2.0-0 \
+			&& apt-get clean \
+			&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
 ## download lastest 7zip for archives

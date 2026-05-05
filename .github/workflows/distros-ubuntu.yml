@@ -31,6 +31,7 @@ jobs:
           - '20-focal'
           - '22-jammy'
           - '24-noble'
+          - '26-resolute'
 
     steps:
       - uses: actions/checkout@v6

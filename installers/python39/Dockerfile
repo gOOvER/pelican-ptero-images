@@ -11,6 +11,7 @@ RUN         apt update \
 		        && apt -y upgrade
 
 RUN         apt -y install --no-install-recommends \
+                nala \
                 build-essential \
                 ca-certificates \
                 curl \

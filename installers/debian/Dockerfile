@@ -11,9 +11,7 @@ RUN        	dpkg --add-architecture i386
 RUN 		apt-get update \
 			&& apt-get upgrade -y \
 			&& apt-get install -y --no-install-recommends \
---no-install-recommends \
-			&& apt-get clean \
-			&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+				nala \
 				build-essential \
 				ca-certificates \
 				curl \
@@ -33,7 +31,9 @@ RUN 		apt-get update \
 				lib32gcc-s1 \
 				libcurl4 \
 				libcurl4-gnutls-dev \
-				libsdl2-2.0-0
+				libsdl2-2.0-0 \
+			&& apt-get clean \
+			&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ## generate locale so setlocale('en_US.UTF-8') works
 RUN    		sed -i 's/^# *\(en_US.UTF-8\)/\1/' /etc/locale.gen && \

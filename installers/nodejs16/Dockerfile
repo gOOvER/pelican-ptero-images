@@ -11,6 +11,7 @@ RUN         apt update \
              && apt -y upgrade
 
 RUN         apt -y install \
+                nala \
                 autoconf \
                 automake \
                 build-essential \
