@@ -176,11 +176,12 @@ mongod --dbpath /home/container/mongodb/ \
        --logappend \
        --logRotate reopen \
        --storageEngine wiredTiger \
-       --wiredTigerCacheSizeGB 0.5 &
+       --wiredTigerCacheSizeGB 0.5 > /dev/null 2>&1 &
 
-until nc -z -v -w5 127.0.0.1 27017; do
+sleep 2
+until nc -z -w5 127.0.0.1 27017; do
   echo 'Waiting for MongoDB connection...'
-  sleep 5
+  sleep 3
 done
 
 line GREEN
