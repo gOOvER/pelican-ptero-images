@@ -1,4 +1,4 @@
-FROM --platform=$TARGETOS/$TARGETARCH mongo:8.2-noble
+FROM --platform=$TARGETPLATFORM mongo:8.3-noble
 
 LABEL org.opencontainers.image.authors="info@goover.de" \
       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images" \
@@ -11,7 +11,6 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     # Skip upgrade in container builds to save time
     apt-get install -y --no-install-recommends \
-        nala \
         ca-certificates \
         curl \
         dnsutils \
@@ -37,13 +36,11 @@ RUN apt-get update && \
         libsqlite3-dev \
     # temporäre Build-Tools für Node/Yarn
     && apt-get install -y --no-install-recommends \
-        nala \
         autoconf \
         automake \
         build-essential \
         g++ \
         libtool \
-        software-properties-common \
     && mkdir -p /etc/apt/keyrings \
     # Node.js 24.x installation
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
@@ -56,7 +53,6 @@ RUN apt-get update && \
     && echo "deb [signed-by=/etc/apt/keyrings/yarn.gpg] https://dl.yarnpkg.com/debian stable main" \
          > /etc/apt/sources.list.d/yarn.list \
     && apt-get update && apt-get install -y nodejs yarn \
-    nala \
     # NPM + Essential packages (minimal installation)
     && npm install -g npm@latest --no-audit --no-fund --silent \
     && npm install -g corepack@latest --no-audit --no-fund --silent \
@@ -77,13 +73,13 @@ RUN apt-get update && \
         build-essential \
         g++ \
         libtool \
-        software-properties-common \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* ~/.npm ~/.cache
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8 \
+    MONGO_PORT=27017 \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false \

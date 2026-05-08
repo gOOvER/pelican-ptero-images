@@ -77,72 +77,84 @@ mkdir -p "$XDG_RUNTIME_DIR"
 # ----------------------------
 # SteamCMD / DepotDownloader Update
 # ----------------------------
+: "${STEAM_USER:=anonymous}"
+: "${STEAM_PASS:=}"
+: "${STEAM_AUTH:=}"
+: "${AUTO_UPDATE:=1}"
+
 if [ -f ./DepotDownloader ]; then
     line BLUE
     msg YELLOW "Using DepotDownloader for updates"
     line BLUE
 
-    : "${STEAM_USER:=anonymous}"  # Default anonymous user
-    : "${STEAM_PASS:=}"
-    : "${STEAM_AUTH:=}"
-
     msg YELLOW "Steam user: ${GREEN}$STEAM_USER"
 
-    dd_args=( -dir . -username "$STEAM_USER" -password "$STEAM_PASS" -remember-password )
-    if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
-        dd_args+=( -os windows )
-    fi
-    dd_args+=( -app "$STEAM_APPID" )
-    if [ -n "${STEAM_BETAID:-}" ]; then
-        dd_args+=( -branch "$STEAM_BETAID" )
-    fi
-    if [ -n "${STEAM_BETAPASS:-}" ]; then
-        dd_args+=( -branchpassword "$STEAM_BETAPASS" )
-    fi
-    ./DepotDownloader "${dd_args[@]}"
+    if [ "${AUTO_UPDATE}" = "1" ]; then
+        dd_args=( -dir . -username "$STEAM_USER" -password "$STEAM_PASS" -remember-password )
+        if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
+            dd_args+=( -os windows )
+        fi
+        dd_args+=( -app "$STEAM_APPID" )
+        if [ -n "${STEAM_BETAID:-}" ]; then
+            dd_args+=( -branch "$STEAM_BETAID" )
+        fi
+        if [ -n "${STEAM_BETAPASS:-}" ]; then
+            dd_args+=( -branchpassword "$STEAM_BETAPASS" )
+        fi
+        ./DepotDownloader "${dd_args[@]}" || { msg RED "DepotDownloader failed (exit $?)"; exit 1; }
 
-    mkdir -p .steam/sdk64
-    dd_sdk_args=( -dir .steam/sdk64 -app 1007 )
-    if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
-        dd_sdk_args+=( -os windows )
-    fi
-    ./DepotDownloader "${dd_sdk_args[@]}"
+        mkdir -p .steam/sdk64
+        dd_sdk_args=( -dir .steam/sdk64 -app 1007 )
+        if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
+            dd_sdk_args+=( -os windows )
+        fi
+        ./DepotDownloader "${dd_sdk_args[@]}" || true  # SDK update failure is non-fatal
 
-    chmod +x "$HOME"/*
+        # Only make actual executables executable, not all files
+        find "$HOME" -maxdepth 1 -type f -executable -o -name "*.sh" -o -name "*.x86_64" -o -name "*.so" 2>/dev/null | xargs -r chmod +x
+    else
+        msg YELLOW "AUTO_UPDATE disabled - skipping update"
+    fi
 else
     line BLUE
     msg YELLOW "Using SteamCMD for updates"
     line BLUE
 
-    : "${STEAM_USER:=anonymous}"  # Default anonymous user
-    : "${STEAM_PASS:=}"
-    : "${STEAM_AUTH:=}"
-
     msg YELLOW "Steam user: ${GREEN}$STEAM_USER"
 
-    sc_args=( +force_install_dir /home/container +login "$STEAM_USER" "$STEAM_PASS" "$STEAM_AUTH" )
-    if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
-        sc_args+=( +@sSteamCmdForcePlatformType windows )
+    if [ "${AUTO_UPDATE}" = "1" ]; then
+        sc_args=( +force_install_dir /home/container +login "$STEAM_USER" "$STEAM_PASS" "$STEAM_AUTH" )
+        if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
+            sc_args+=( +@sSteamCmdForcePlatformType windows )
+        fi
+        if [ "${STEAM_SDK:-0}" = "1" ]; then
+            sc_args+=( +app_update 1007 )
+        fi
+        sc_args+=( +app_update "$STEAM_APPID" )
+        if [ -n "${STEAM_BETAID:-}" ]; then
+            sc_args+=( -beta "$STEAM_BETAID" )
+        fi
+        if [ -n "${STEAM_BETAPASS:-}" ]; then
+            sc_args+=( -betapassword "$STEAM_BETAPASS" )
+        fi
+        if [ -n "${INSTALL_FLAGS:-}" ]; then
+            IFS=' ' read -r -a extra_flags <<<"$INSTALL_FLAGS"
+            sc_args+=( "${extra_flags[@]}" )
+        fi
+        # Respect VALIDATE flag
+        if [ "${VALIDATE:-0}" = "1" ]; then
+            sc_args+=( validate )
+        fi
+        sc_args+=( +quit )
+        ./steamcmd/steamcmd.sh "${sc_args[@]}"
+        STEAMCMD_EXIT=$?
+        if [ $STEAMCMD_EXIT -ne 0 ]; then
+            msg RED "SteamCMD failed with exit code $STEAMCMD_EXIT"
+            exit $STEAMCMD_EXIT
+        fi
+    else
+        msg YELLOW "AUTO_UPDATE disabled - skipping update"
     fi
-    if [ "${STEAM_SDK:-0}" = "1" ]; then
-        sc_args+=( +app_update 1007 )
-    fi
-    sc_args+=( +app_update "$STEAM_APPID" )
-    if [ -n "${STEAM_BETAID:-}" ]; then
-        sc_args+=( -beta "$STEAM_BETAID" )
-    fi
-    if [ -n "${STEAM_BETAPASS:-}" ]; then
-        sc_args+=( -betapassword "$STEAM_BETAPASS" )
-    fi
-    if [ -n "${INSTALL_FLAGS:-}" ]; then
-        IFS=' ' read -r -a extra_flags <<<"$INSTALL_FLAGS"
-        sc_args+=( "${extra_flags[@]}" )
-    fi
-    if [ "${VALIDATE:-0}" = "1" ]; then
-        sc_args+=( validate )
-    fi
-    sc_args+=( +quit )
-    ./steamcmd/steamcmd.sh "${sc_args[@]}" || msg RED "SteamCMD failed"
 fi
 
 
@@ -153,6 +165,5 @@ fi
 MODIFIED_STARTUP=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 msg CYAN ":/home/container$ $MODIFIED_STARTUP"
 
-# exec bash -c für komplexe Shell-Kommandos
 exec bash -c "$MODIFIED_STARTUP"
 

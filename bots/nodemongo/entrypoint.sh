@@ -62,6 +62,7 @@ cd /home/container || { msg RED "Failed to change directory to /home/container."
 sleep 1
 
 export TZ=${TZ:-UTC}
+export MONGO_PORT=${MONGO_PORT:-27017}
 
 # Get internal IP with better error handling
 INTERNAL_IP=""
@@ -100,7 +101,7 @@ chown -R container:container /home/container/mongodb 2>/dev/null || true
 # Note: mongod --version may fail on Linux kernel 6.19+ without GLIBC_TUNABLES set.
 # GLIBC_TUNABLES=glibc.pthread.rseq=1 is set via ENV in the Dockerfile as the workaround.
 MONGO_VERSION=$(mongod --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 | cut -d. -f1-2)
-MONGO_VERSION=${MONGO_VERSION:-"8.2"}
+MONGO_VERSION=${MONGO_VERSION:-"8.3"}
 MONGO_MAJOR=$(echo "$MONGO_VERSION" | cut -d. -f1)
 MONGO_MINOR=$(echo "$MONGO_VERSION" | cut -d. -f2)
 MONGO_MARKER="/home/container/mongodb/.mongodb${MONGO_VERSION//./_}_upgraded"
@@ -122,7 +123,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
         msg YELLOW "Testing MongoDB $MONGO_VERSION compatibility..."
 
         # Start mongod briefly to check for errors
-        mongod --dbpath /home/container/mongodb/ --port 27018 --logpath /tmp/mongo_test.log --fork 2>/dev/null || true
+        mongod --dbpath /home/container/mongodb/ --port $((MONGO_PORT + 1)) --logpath /tmp/mongo_test.log --fork 2>/dev/null || true
         sleep 2
 
         # Check if the test log contains version compatibility errors
@@ -143,7 +144,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
             msg YELLOW "Creating backup of existing data for safety..."
 
             # Stop the test mongod
-            mongod --shutdown --port 27018 2>/dev/null || pkill -f "mongod.*27018" || true
+            mongod --shutdown --dbpath /home/container/mongodb/ 2>/dev/null || pkill -f "mongod.*$((MONGO_PORT + 1))" || true
 
             # Create backup directory with timestamp
             BACKUP_DIR="/home/container/mongodb_backup_$(date +%Y%m%d_%H%M%S)"
@@ -162,7 +163,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
             touch "$MONGO_MARKER"
         else
             # Stop the test mongod if it started successfully
-            mongod --shutdown --port 27018 2>/dev/null || pkill -f "mongod.*27018" || true
+            mongod --shutdown --dbpath /home/container/mongodb/ 2>/dev/null || pkill -f "mongod.*$((MONGO_PORT + 1))" || true
             line GREEN
             msg GREEN "✓ MongoDB $MONGO_VERSION can upgrade from existing data"
 
@@ -184,18 +185,17 @@ fi
 line BLUE
 # MongoDB startup with latest features and optimizations
 mongod --dbpath /home/container/mongodb/ \
-       --port 27017 \
+       --port $MONGO_PORT \
        --bind_ip_all \
        --logpath /home/container/mongod.log \
        --logappend \
        --storageEngine wiredTiger \
        --wiredTigerCacheSizeGB 0.5 \
        --setParameter enableFlowControl=true \
-       --setParameter flowControlTargetLagSeconds=10 \
-       --setParameter mirrorReads="{samplingRate: 0.01}" > /dev/null 2>&1 &
+       --setParameter flowControlTargetLagSeconds=10 > /dev/null 2>&1 &
 
 sleep 2
-until nc -z -w5 127.0.0.1 27017; do
+until nc -z -w5 127.0.0.1 $MONGO_PORT; do
   echo 'Waiting for MongoDB connection...'
   sleep 3
 done
@@ -214,7 +214,7 @@ msg YELLOW "Checking MongoDB Feature Compatibility Version (MongoDB $MONGO_VERSI
 
 # Check and set FCV using mongosh
 if command -v mongosh &> /dev/null; then
-    CURRENT_FCV=$(mongosh --quiet --eval "db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 }).featureCompatibilityVersion.version" 2>/dev/null || echo "unknown")
+    CURRENT_FCV=$(mongosh --quiet --port $MONGO_PORT --eval "db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 }).featureCompatibilityVersion.version" 2>/dev/null || echo "unknown")
 
     if [ "$CURRENT_FCV" != "$TARGET_FCV" ] && [ "$CURRENT_FCV" != "unknown" ]; then
         msg YELLOW "Current FCV: $CURRENT_FCV"
@@ -225,12 +225,12 @@ if command -v mongosh &> /dev/null; then
             msg YELLOW "⚠ MongoDB 8.2+ detected with FCV 7.x - staged upgrade required"
             msg YELLOW "Step 1: Upgrading FCV to 8.0 first..."
 
-            if mongosh --quiet --eval 'db.adminCommand({ setFeatureCompatibilityVersion: "8.0" })' 2>/dev/null; then
+            if mongosh --quiet --port $MONGO_PORT --eval 'db.adminCommand({ setFeatureCompatibilityVersion: "8.0", confirm: true })' 2>/dev/null; then
                 msg GREEN "✓ FCV upgraded to 8.0"
                 sleep 2
                 msg YELLOW "Step 2: Upgrading FCV to $TARGET_FCV..."
 
-                if mongosh --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$TARGET_FCV\" })" 2>/dev/null; then
+                if mongosh --quiet --port $MONGO_PORT --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$TARGET_FCV\", confirm: true })" 2>/dev/null; then
                     msg GREEN "✓ Feature Compatibility Version successfully upgraded to $TARGET_FCV"
                 else
                     msg RED "⚠ FCV upgrade to $TARGET_FCV failed - staying at 8.0"
@@ -242,7 +242,7 @@ if command -v mongosh &> /dev/null; then
         else
             # Direct upgrade possible
             msg YELLOW "Upgrading to $TARGET_FCV..."
-            if mongosh --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$TARGET_FCV\" })" 2>/dev/null; then
+            if mongosh --quiet --port $MONGO_PORT --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$TARGET_FCV\", confirm: true })" 2>/dev/null; then
                 msg GREEN "✓ Feature Compatibility Version set to $TARGET_FCV"
             else
                 msg YELLOW "⚠ Could not set FCV - MongoDB might not support direct upgrade"
@@ -255,7 +255,7 @@ if command -v mongosh &> /dev/null; then
 else
     # Fallback to mongo shell if mongosh not available
     msg YELLOW "Using legacy mongo shell..."
-    mongo --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$TARGET_FCV\" })" 2>/dev/null && \
+    mongo --quiet --port $MONGO_PORT --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$TARGET_FCV\", confirm: true })" 2>/dev/null && \
         msg GREEN "✓ Feature Compatibility Version set to $TARGET_FCV" || \
         msg YELLOW "⚠ Could not verify/set FCV"
 fi

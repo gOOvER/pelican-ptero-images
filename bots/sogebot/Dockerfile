@@ -1,4 +1,4 @@
-FROM        --platform=$BUILDPLATFORM node:22-bookworm-slim
+FROM        --platform=$BUILDPLATFORM node:24-trixie-slim
 
 LABEL       org.opencontainers.image.authors="info@goover.de"
 LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"

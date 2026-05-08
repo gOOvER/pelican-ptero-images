@@ -199,7 +199,7 @@ if command -v mongosh &> /dev/null; then
 
     if [ "$CURRENT_FCV" != "$MONGO_VERSION" ] && [ "$CURRENT_FCV" != "unknown" ]; then
         msg YELLOW "Current FCV: $CURRENT_FCV - Upgrading to $MONGO_VERSION..."
-        mongosh --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\" })" 2>/dev/null && \
+        mongosh --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\", confirm: true })" 2>/dev/null && \
             msg GREEN "✓ Feature Compatibility Version set to $MONGO_VERSION" || \
             msg YELLOW "⚠ Could not set FCV (might already be correct)"
     else
@@ -208,7 +208,7 @@ if command -v mongosh &> /dev/null; then
 else
     # Fallback to mongo shell if mongosh not available
     msg YELLOW "Using legacy mongo shell..."
-    mongo --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\" })" 2>/dev/null && \
+    mongo --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\", confirm: true })" 2>/dev/null && \
         msg GREEN "✓ Feature Compatibility Version set to $MONGO_VERSION" || \
         msg YELLOW "⚠ Could not verify/set FCV"
 fi
