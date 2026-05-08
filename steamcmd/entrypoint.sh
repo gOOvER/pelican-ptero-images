@@ -146,11 +146,15 @@ else
             sc_args+=( validate )
         fi
         sc_args+=( +quit )
-        ./steamcmd/steamcmd.sh "${sc_args[@]}"
-        STEAMCMD_EXIT=$?
-        if [ $STEAMCMD_EXIT -ne 0 ]; then
+        ./steamcmd/steamcmd.sh "${sc_args[@]}" || STEAMCMD_EXIT=$?
+        STEAMCMD_EXIT=${STEAMCMD_EXIT:-0}
+        # SteamCMD exit code 5 = no connection but may still have succeeded,
+        # exit code 8 = unknown, treat anything >=10 as a real failure
+        if [ "$STEAMCMD_EXIT" -ge 10 ]; then
             msg RED "SteamCMD failed with exit code $STEAMCMD_EXIT"
-            exit $STEAMCMD_EXIT
+            exit "$STEAMCMD_EXIT"
+        elif [ "$STEAMCMD_EXIT" -ne 0 ]; then
+            msg YELLOW "SteamCMD exited with code $STEAMCMD_EXIT (non-fatal)"
         fi
     else
         msg YELLOW "AUTO_UPDATE disabled - skipping update"
