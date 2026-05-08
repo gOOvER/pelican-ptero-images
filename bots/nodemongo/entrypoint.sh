@@ -96,19 +96,21 @@ line BLUE
 mkdir -p /home/container/mongodb
 chown -R container:container /home/container/mongodb 2>/dev/null || true
 
+# Detect MongoDB major.minor version (e.g. "8.0", "8.2", "8.3")
+MONGO_VERSION=$(mongod --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 | cut -d. -f1-2)
+MONGO_VERSION=${MONGO_VERSION:-"8.0"}
+MONGO_MAJOR=$(echo "$MONGO_VERSION" | cut -d. -f1)
+MONGO_MINOR=$(echo "$MONGO_VERSION" | cut -d. -f2)
+MONGO_MARKER="/home/container/mongodb/.mongodb${MONGO_VERSION//./_}_upgraded"
+
 # Check for MongoDB version compatibility issues and clean if needed
 # Only run compatibility check if we haven't already migrated (check for marker file)
 if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mongodb/WiredTiger.wt" ]; then
     line YELLOW
     msg YELLOW "Existing MongoDB data detected - checking compatibility..."
 
-    # Detect MongoDB version
-    MONGO_VERSION=$(mongod --version | grep -oP 'db version v\K[0-9]+\.[0-9]+' | head -1)
-    MONGO_MAJOR=$(echo "$MONGO_VERSION" | cut -d. -f1)
-    MONGO_MINOR=$(echo "$MONGO_VERSION" | cut -d. -f2)
-
     # Check if we've already done a migration (marker file exists)
-    if [ -f "/home/container/mongodb/.mongodb8_upgraded" ]; then
+    if [ -f "$MONGO_MARKER" ]; then
         line GREEN
         msg GREEN "MongoDB $MONGO_VERSION upgrade already completed, skipping compatibility check..."
     else
@@ -155,7 +157,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
             line GREEN
 
             # Create marker file
-            touch /home/container/mongodb/.mongodb8_upgraded
+            touch "$MONGO_MARKER"
         else
             # Stop the test mongod if it started successfully
             mongod --shutdown --port 27018 2>/dev/null || pkill -f "mongod.*27018" || true
@@ -163,7 +165,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
             msg GREEN "✓ MongoDB $MONGO_VERSION can upgrade from existing data"
 
             # Create marker file to skip check on future restarts
-            touch /home/container/mongodb/.mongodb8_upgraded
+            touch "$MONGO_MARKER"
         fi
 
         # Clean up test log
@@ -174,11 +176,11 @@ else
     line GREEN
     msg GREEN "MongoDB data directory ready..."
     # Create marker file for future restarts
-    touch /home/container/mongodb/.mongodb8_upgraded
+    touch "$MONGO_MARKER"
 fi
 
 line BLUE
-# MongoDB 8.x startup with latest features and optimizations
+# MongoDB startup with latest features and optimizations
 mongod --dbpath /home/container/mongodb/ \
        --port 27017 \
        --bind_ip_all \
@@ -186,7 +188,6 @@ mongod --dbpath /home/container/mongodb/ \
        --logappend \
        --storageEngine wiredTiger \
        --wiredTigerCacheSizeGB 0.5 \
-       --wiredTigerEngineConfigString="cache_size=512MB" \
        --setParameter enableFlowControl=true \
        --setParameter flowControlTargetLagSeconds=10 \
        --setParameter mirrorReads="{samplingRate: 0.01}" &
@@ -203,10 +204,7 @@ msg GREEN "✓ MongoDB is ready"
 # Set Feature Compatibility Version dynamically
 # ----------------------------
 line CYAN
-# Detect MongoDB version from the running instance
-MONGO_VERSION=$(mongod --version | grep -oP 'db version v\K[0-9]+\.[0-9]+' | head -1)
-MONGO_MAJOR=$(echo "$MONGO_VERSION" | cut -d. -f1)
-MONGO_MINOR=$(echo "$MONGO_VERSION" | cut -d. -f2)
+# TARGET_FCV comes from the MONGO_VERSION detected at startup
 TARGET_FCV="$MONGO_VERSION"
 
 msg YELLOW "Checking MongoDB Feature Compatibility Version (MongoDB $MONGO_VERSION)..."

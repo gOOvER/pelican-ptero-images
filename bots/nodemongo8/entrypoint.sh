@@ -96,6 +96,11 @@ line BLUE
 mkdir -p /home/container/mongodb
 chown -R container:container /home/container/mongodb 2>/dev/null || true
 
+# Detect MongoDB major.minor version (e.g. "8.0", "8.2")
+MONGO_VERSION=$(mongod --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 | cut -d. -f1-2)
+MONGO_VERSION=${MONGO_VERSION:-"8.0"}
+MONGO_MARKER="/home/container/mongodb/.mongodb${MONGO_VERSION//./_}_upgraded"
+
 # Check for MongoDB version compatibility issues and clean if needed
 # Only run compatibility check if we haven't already migrated (check for marker file)
 if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mongodb/WiredTiger.wt" ]; then
@@ -103,14 +108,14 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
     msg YELLOW "Existing MongoDB data detected - checking compatibility..."
 
     # Check if we've already done a migration (marker file exists)
-    if [ -f "/home/container/mongodb/.mongodb8_upgraded" ]; then
+    if [ -f "$MONGO_MARKER" ]; then
         line GREEN
-        msg GREEN "MongoDB 8.0 upgrade already completed, skipping compatibility check..."
+        msg GREEN "MongoDB $MONGO_VERSION upgrade already completed, skipping compatibility check..."
     else
-        # MongoDB 8.0 supports direct upgrade from 7.x
+        # MongoDB supports direct upgrade from previous minor versions
         # Just ensure featureCompatibilityVersion is set correctly
         line CYAN
-        msg YELLOW "Testing MongoDB 8.0 compatibility..."
+        msg YELLOW "Testing MongoDB $MONGO_VERSION compatibility..."
 
         # Start mongod briefly to check for critical errors
         mongod --dbpath /home/container/mongodb/ --port 27018 --logpath /tmp/mongo_test.log --fork 2>/dev/null || true
@@ -135,36 +140,36 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
 
             line GREEN
             msg GREEN "✓ Data backed up to: $BACKUP_DIR"
-            msg GREEN "✓ Starting fresh MongoDB 8.0 instance"
+            msg GREEN "✓ Starting fresh MongoDB $MONGO_VERSION instance"
             msg YELLOW "⚠ Restore your data using mongorestore if needed"
             line GREEN
 
             # Create marker file
-            touch /home/container/mongodb/.mongodb8_upgraded
+            touch "$MONGO_MARKER"
         else
             # Stop the test mongod if it started successfully
             mongod --shutdown --port 27018 2>/dev/null || pkill -f "mongod.*27018" || true
             line GREEN
-            msg GREEN "✓ MongoDB 8.0 can upgrade from existing data"
+            msg GREEN "✓ MongoDB $MONGO_VERSION can upgrade from existing data"
             msg YELLOW "Note: MongoDB will automatically upgrade featureCompatibilityVersion on first start"
 
             # Create marker file to skip check on future restarts
-            touch /home/container/mongodb/.mongodb8_upgraded
+            touch "$MONGO_MARKER"
         fi
 
         # Clean up test log
         rm -f /tmp/mongo_test.log
     fi
 else
-    # Fresh MongoDB 8.0 data or already compatible
+    # Fresh MongoDB data or already compatible
     line GREEN
-    msg GREEN "MongoDB 8.0 data directory ready..."
+    msg GREEN "MongoDB $MONGO_VERSION data directory ready..."
     # Create marker file for future restarts
-    touch /home/container/mongodb/.mongodb8_upgraded
+    touch "$MONGO_MARKER"
 fi
 
 line BLUE
-# MongoDB 8.0 startup with latest features
+# MongoDB startup
 mongod --dbpath /home/container/mongodb/ \
        --port 27017 \
        --bind_ip_all \
@@ -172,7 +177,6 @@ mongod --dbpath /home/container/mongodb/ \
        --logappend \
        --storageEngine wiredTiger \
        --wiredTigerCacheSizeGB 0.5 \
-       --wiredTigerEngineConfigString="cache_size=512MB" \
        --setParameter enableFlowControl=true \
        --setParameter flowControlTargetLagSeconds=10 \
        --setParameter mirrorReads="{samplingRate: 0.01}" &
@@ -186,28 +190,28 @@ line GREEN
 msg GREEN "✓ MongoDB is ready"
 
 # ----------------------------
-# Set Feature Compatibility Version to 8.0
+# Set Feature Compatibility Version
 # ----------------------------
 line CYAN
-msg YELLOW "Setting MongoDB Feature Compatibility Version to 8.0..."
+msg YELLOW "Setting MongoDB Feature Compatibility Version to $MONGO_VERSION..."
 
 # Check and set FCV using mongosh
 if command -v mongosh &> /dev/null; then
     CURRENT_FCV=$(mongosh --quiet --eval "db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 }).featureCompatibilityVersion.version" 2>/dev/null || echo "unknown")
 
-    if [ "$CURRENT_FCV" != "8.0" ] && [ "$CURRENT_FCV" != "unknown" ]; then
-        msg YELLOW "Current FCV: $CURRENT_FCV - Upgrading to 8.0..."
-        mongosh --quiet --eval 'db.adminCommand({ setFeatureCompatibilityVersion: "8.0" })' 2>/dev/null && \
-            msg GREEN "✓ Feature Compatibility Version set to 8.0" || \
+    if [ "$CURRENT_FCV" != "$MONGO_VERSION" ] && [ "$CURRENT_FCV" != "unknown" ]; then
+        msg YELLOW "Current FCV: $CURRENT_FCV - Upgrading to $MONGO_VERSION..."
+        mongosh --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\" })" 2>/dev/null && \
+            msg GREEN "✓ Feature Compatibility Version set to $MONGO_VERSION" || \
             msg YELLOW "⚠ Could not set FCV (might already be correct)"
     else
-        msg GREEN "✓ Feature Compatibility Version already at 8.0"
+        msg GREEN "✓ Feature Compatibility Version already at $MONGO_VERSION"
     fi
 else
     # Fallback to mongo shell if mongosh not available
     msg YELLOW "Using legacy mongo shell..."
-    mongo --quiet --eval 'db.adminCommand({ setFeatureCompatibilityVersion: "8.0" })' 2>/dev/null && \
-        msg GREEN "✓ Feature Compatibility Version set to 8.0" || \
+    mongo --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\" })" 2>/dev/null && \
+        msg GREEN "✓ Feature Compatibility Version set to $MONGO_VERSION" || \
         msg YELLOW "⚠ Could not verify/set FCV"
 fi
 

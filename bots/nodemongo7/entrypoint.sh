@@ -73,7 +73,7 @@ export INTERNAL_IP
 # ----------------------------
 clear
 line BLUE
-msg RED "NodeJS & MongoDB 7.x Image by gOOvER - https://discord.goover.dev"
+msg RED "NodeJS & MongoDB Image by gOOvER - https://discord.goover.dev"
 msg RED "This Image is licencend under AGPLv3"
 line BLUE
 msg YELLOW "Running on: ${RED}$(. /etc/os-release ; echo $NAME $VERSION)"
@@ -86,15 +86,20 @@ msg YELLOW "MongoDB Version: ${RED}$(mongod --version | head -n 1)"
 line BLUE
 
 # ----------------------------
-# Start MongoDB 7.x
+# Start MongoDB
 # ----------------------------
 line BLUE
-msg YELLOW "Starting MongoDB 7.x..."
+msg YELLOW "Starting MongoDB..."
 line BLUE
 
 # Ensure MongoDB directory exists and has correct permissions
 mkdir -p /home/container/mongodb
 chown -R container:container /home/container/mongodb 2>/dev/null || true
+
+# Detect MongoDB major.minor version (e.g. "7.0")
+MONGO_VERSION=$(mongod --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 | cut -d. -f1-2)
+MONGO_VERSION=${MONGO_VERSION:-"7.0"}
+MONGO_MARKER="/home/container/mongodb/.mongodb${MONGO_VERSION//./_}_upgraded"
 
 # Check for existing MongoDB data and ensure compatibility
 # Only run compatibility check if we haven't already checked (check for marker file)
@@ -103,14 +108,14 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
     msg YELLOW "Existing MongoDB data detected - checking compatibility..."
 
     # Check if we've already done a compatibility check (marker file exists)
-    if [ -f "/home/container/mongodb/.mongodb7_checked" ]; then
+    if [ -f "$MONGO_MARKER" ]; then
         line GREEN
-        msg GREEN "MongoDB 7.x compatibility already verified, skipping check..."
-    # MongoDB 7.x can handle most previous versions better than 8.x
+        msg GREEN "MongoDB $MONGO_VERSION compatibility already verified, skipping check..."
+    # MongoDB can handle most previous versions
     # Simple compatibility check for very old data formats
     elif [ -f "/home/container/mongodb/storage.bson" ]; then
         line CYAN
-        msg YELLOW "Checking MongoDB 7.x data compatibility (one-time check)..."
+        msg YELLOW "Checking MongoDB $MONGO_VERSION data compatibility (one-time check)..."
 
         # Quick test startup to verify data integrity
         mongod --dbpath /home/container/mongodb/ --port 27018 --logpath /tmp/mongo_test.log --fork 2>/dev/null || true
@@ -137,33 +142,33 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
 
             line GREEN
             msg GREEN "✓ Problematic data backed up to: $BACKUP_DIR"
-            msg GREEN "✓ Starting fresh MongoDB 7.x instance"
+            msg GREEN "✓ Starting fresh MongoDB $MONGO_VERSION instance"
             line GREEN
 
             # Create marker file to prevent re-check on next restart
-            touch /home/container/mongodb/.mongodb7_checked
+            touch "$MONGO_MARKER"
         else
             # Stop the test mongod if it started successfully
             mongod --shutdown --port 27018 2>/dev/null || pkill -f "mongod.*27018" || true
             line GREEN
-            msg GREEN "MongoDB 7.x data appears compatible, continuing..."
+            msg GREEN "MongoDB $MONGO_VERSION data appears compatible, continuing..."
 
             # Create marker file to skip check on future restarts
-            touch /home/container/mongodb/.mongodb7_checked
+            touch "$MONGO_MARKER"
         fi
 
         # Clean up test log
         rm -f /tmp/mongo_test.log
     else
         line GREEN
-        msg GREEN "MongoDB data directory detected, proceeding with 7.x startup..."
+        msg GREEN "MongoDB data directory detected, proceeding with $MONGO_VERSION startup..."
         # Create marker file for future restarts
-        touch /home/container/mongodb/.mongodb7_checked
+        touch "$MONGO_MARKER"
     fi
 fi
 
 line BLUE
-# MongoDB 7.x startup with WiredTiger optimizations
+# MongoDB startup with WiredTiger optimizations
 mongod --dbpath /home/container/mongodb/ \
        --port 27017 \
        --bind_ip_all \
@@ -171,8 +176,7 @@ mongod --dbpath /home/container/mongodb/ \
        --logappend \
        --logRotate reopen \
        --storageEngine wiredTiger \
-       --wiredTigerCacheSizeGB 0.5 \
-       --wiredTigerEngineConfigString="cache_size=512MB" &
+       --wiredTigerCacheSizeGB 0.5 &
 
 until nc -z -v -w5 127.0.0.1 27017; do
   echo 'Waiting for MongoDB connection...'
@@ -183,28 +187,28 @@ line GREEN
 msg GREEN "✓ MongoDB is ready"
 
 # ----------------------------
-# Set Feature Compatibility Version to 7.0
+# Set Feature Compatibility Version
 # ----------------------------
 line CYAN
-msg YELLOW "Setting MongoDB Feature Compatibility Version to 7.0..."
+msg YELLOW "Setting MongoDB Feature Compatibility Version to $MONGO_VERSION..."
 
 # Check and set FCV using mongosh or legacy mongo
 if command -v mongosh &> /dev/null; then
     CURRENT_FCV=$(mongosh --quiet --eval "db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 }).featureCompatibilityVersion.version" 2>/dev/null || echo "unknown")
 
-    if [ "$CURRENT_FCV" != "7.0" ] && [ "$CURRENT_FCV" != "unknown" ]; then
-        msg YELLOW "Current FCV: $CURRENT_FCV - Upgrading to 7.0..."
-        mongosh --quiet --eval 'db.adminCommand({ setFeatureCompatibilityVersion: "7.0" })' 2>/dev/null && \
-            msg GREEN "✓ Feature Compatibility Version set to 7.0" || \
+    if [ "$CURRENT_FCV" != "$MONGO_VERSION" ] && [ "$CURRENT_FCV" != "unknown" ]; then
+        msg YELLOW "Current FCV: $CURRENT_FCV - Upgrading to $MONGO_VERSION..."
+        mongosh --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\" })" 2>/dev/null && \
+            msg GREEN "✓ Feature Compatibility Version set to $MONGO_VERSION" || \
             msg YELLOW "⚠ Could not set FCV (might already be correct)"
     else
-        msg GREEN "✓ Feature Compatibility Version already at 7.0"
+        msg GREEN "✓ Feature Compatibility Version already at $MONGO_VERSION"
     fi
 else
     # Fallback to mongo shell if mongosh not available
     msg YELLOW "Using legacy mongo shell..."
-    mongo --quiet --eval 'db.adminCommand({ setFeatureCompatibilityVersion: "7.0" })' 2>/dev/null && \
-        msg GREEN "✓ Feature Compatibility Version set to 7.0" || \
+    mongo --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\" })" 2>/dev/null && \
+        msg GREEN "✓ Feature Compatibility Version set to $MONGO_VERSION" || \
         msg YELLOW "⚠ Could not verify/set FCV"
 fi
 
