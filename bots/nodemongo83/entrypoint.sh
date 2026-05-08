@@ -97,8 +97,10 @@ mkdir -p /home/container/mongodb
 chown -R container:container /home/container/mongodb 2>/dev/null || true
 
 # Detect MongoDB major.minor version (e.g. "8.3", "8.0")
+# Note: mongod --version may fail on Linux kernel 6.19+ without GLIBC_TUNABLES set.
+# GLIBC_TUNABLES=glibc.pthread.rseq=1 is set via ENV in the Dockerfile as the workaround.
 MONGO_VERSION=$(mongod --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 | cut -d. -f1-2)
-MONGO_VERSION=${MONGO_VERSION:-"8.0"}
+MONGO_VERSION=${MONGO_VERSION:-"8.3"}
 MONGO_MARKER="/home/container/mongodb/.mongodb${MONGO_VERSION//./_}_upgraded"
 
 # Check for MongoDB version compatibility issues and clean if needed

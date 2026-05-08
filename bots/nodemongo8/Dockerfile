@@ -86,7 +86,11 @@ ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \
-    NPM_CONFIG_AUDIT=false
+    NPM_CONFIG_AUDIT=false \
+    # Workaround for MongoDB 8.x incompatibility with Linux kernel 6.19+
+    # https://jira.mongodb.org/browse/SERVER-121912
+    # Disables TCMalloc's RSEQ path by enabling glibc's RSEQ, preventing crashes/startup failure
+    GLIBC_TUNABLES=glibc.pthread.rseq=1
 
 # Create user
 RUN useradd -m -d /home/container -s /bin/bash container
