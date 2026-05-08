@@ -1,4 +1,4 @@
-FROM --platform=$TARGETOS/$TARGETARCH mongo:8.-noble
+FROM --platform=$TARGETOS/$TARGETARCH mongo:8.0-noble
 
 LABEL org.opencontainers.image.authors="info@goover.de" \
       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images" \
