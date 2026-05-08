@@ -45,7 +45,7 @@ line() {
 
 cleanup() {
     msg YELLOW "Cleaning up..."
-    # Simple cleanup - mongod --shutdown will handle MongoDB
+    mongod --shutdown --dbpath /home/container/mongodb/ 2>/dev/null || true
 }
 
 # ----------------------------
@@ -131,7 +131,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
             msg YELLOW "Creating backup of existing data for safety..."
 
             # Stop the test mongod
-            mongod --shutdown --port 27018 2>/dev/null || pkill -f "mongod.*27018" || true
+            mongod --shutdown --dbpath /home/container/mongodb/ 2>/dev/null || pkill -f "mongod.*27018" || true
 
             # Create backup directory with timestamp
             BACKUP_DIR="/home/container/mongodb_backup_$(date +%Y%m%d_%H%M%S)"
@@ -150,7 +150,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
             touch "$MONGO_MARKER"
         else
             # Stop the test mongod if it started successfully
-            mongod --shutdown --port 27018 2>/dev/null || pkill -f "mongod.*27018" || true
+            mongod --shutdown --dbpath /home/container/mongodb/ 2>/dev/null || pkill -f "mongod.*27018" || true
             line GREEN
             msg GREEN "✓ MongoDB $MONGO_VERSION can upgrade from existing data"
             msg YELLOW "Note: MongoDB will automatically upgrade featureCompatibilityVersion on first start"
@@ -180,8 +180,7 @@ mongod --dbpath /home/container/mongodb/ \
        --storageEngine wiredTiger \
        --wiredTigerCacheSizeGB 0.5 \
        --setParameter enableFlowControl=true \
-       --setParameter flowControlTargetLagSeconds=10 \
-       --setParameter mirrorReads="{samplingRate: 0.01}" > /dev/null 2>&1 &
+       --setParameter flowControlTargetLagSeconds=10 > /dev/null 2>&1 &
 
 sleep 2
 until nc -z -w5 127.0.0.1 27017; do
