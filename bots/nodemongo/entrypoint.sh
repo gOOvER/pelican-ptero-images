@@ -63,6 +63,8 @@ sleep 1
 
 export TZ=${TZ:-UTC}
 export MONGO_PORT=${MONGO_PORT:-27017}
+export MONGO_DB=${MONGO_DB:-botdb}
+export MONGO_URL=${MONGO_URL:-"mongodb://127.0.0.1:${MONGO_PORT}/${MONGO_DB}"}
 
 # Get internal IP with better error handling
 INTERNAL_IP=""

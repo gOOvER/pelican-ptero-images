@@ -84,6 +84,8 @@ RUN apt-get update && \
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8 \
+    MONGO_PORT=27017 \
+    MONGO_DB=botdb \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false \

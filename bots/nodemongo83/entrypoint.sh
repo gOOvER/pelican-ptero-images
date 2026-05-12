@@ -62,6 +62,9 @@ cd /home/container || { msg RED "Failed to change directory to /home/container."
 sleep 1
 
 export TZ=${TZ:-UTC}
+export MONGO_PORT=${MONGO_PORT:-27017}
+export MONGO_DB=${MONGO_DB:-botdb}
+export MONGO_URL=${MONGO_URL:-"mongodb://127.0.0.1:${MONGO_PORT}/${MONGO_DB}"}
 
 # Get internal IP with better error handling
 INTERNAL_IP=""
@@ -120,7 +123,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
         msg YELLOW "Testing MongoDB $MONGO_VERSION compatibility..."
 
         # Start mongod briefly to check for critical errors
-        mongod --dbpath /home/container/mongodb/ --port 27018 --logpath /tmp/mongo_test.log --fork 2>/dev/null || true
+        mongod --dbpath /home/container/mongodb/ --port $((MONGO_PORT + 1)) --logpath /tmp/mongo_test.log --fork 2>/dev/null || true
         sleep 2
 
         # Check if the test log contains CRITICAL version errors (not just warnings)
@@ -131,7 +134,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
             msg YELLOW "Creating backup of existing data for safety..."
 
             # Stop the test mongod
-            mongod --shutdown --dbpath /home/container/mongodb/ 2>/dev/null || pkill -f "mongod.*27018" || true
+            mongod --shutdown --dbpath /home/container/mongodb/ 2>/dev/null || pkill -f "mongod.*$((MONGO_PORT + 1))" || true
 
             # Create backup directory with timestamp
             BACKUP_DIR="/home/container/mongodb_backup_$(date +%Y%m%d_%H%M%S)"
@@ -150,7 +153,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
             touch "$MONGO_MARKER"
         else
             # Stop the test mongod if it started successfully
-            mongod --shutdown --dbpath /home/container/mongodb/ 2>/dev/null || pkill -f "mongod.*27018" || true
+            mongod --shutdown --dbpath /home/container/mongodb/ 2>/dev/null || pkill -f "mongod.*$((MONGO_PORT + 1))" || true
             line GREEN
             msg GREEN "✓ MongoDB $MONGO_VERSION can upgrade from existing data"
             msg YELLOW "Note: MongoDB will automatically upgrade featureCompatibilityVersion on first start"
@@ -173,7 +176,7 @@ fi
 line BLUE
 # MongoDB startup
 mongod --dbpath /home/container/mongodb/ \
-       --port 27017 \
+       --port $MONGO_PORT \
        --bind_ip_all \
        --logpath /home/container/mongod.log \
        --logappend \
@@ -183,7 +186,7 @@ mongod --dbpath /home/container/mongodb/ \
        --setParameter flowControlTargetLagSeconds=10 > /dev/null 2>&1 &
 
 sleep 2
-until nc -z -w5 127.0.0.1 27017; do
+until nc -z -w5 127.0.0.1 $MONGO_PORT; do
   echo 'Waiting for MongoDB connection...'
   sleep 3
 done
@@ -199,11 +202,11 @@ msg YELLOW "Setting MongoDB Feature Compatibility Version to $MONGO_VERSION..."
 
 # Check and set FCV using mongosh
 if command -v mongosh &> /dev/null; then
-    CURRENT_FCV=$(mongosh --quiet --eval "db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 }).featureCompatibilityVersion.version" 2>/dev/null || echo "unknown")
+    CURRENT_FCV=$(mongosh --quiet --port $MONGO_PORT --eval "db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 }).featureCompatibilityVersion.version" 2>/dev/null || echo "unknown")
 
     if [ "$CURRENT_FCV" != "$MONGO_VERSION" ] && [ "$CURRENT_FCV" != "unknown" ]; then
         msg YELLOW "Current FCV: $CURRENT_FCV - Upgrading to $MONGO_VERSION..."
-        mongosh --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\", confirm: true })" 2>/dev/null && \
+        mongosh --quiet --port $MONGO_PORT --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\", confirm: true })" 2>/dev/null && \
             msg GREEN "✓ Feature Compatibility Version set to $MONGO_VERSION" || \
             msg YELLOW "⚠ Could not set FCV (might already be correct)"
     else

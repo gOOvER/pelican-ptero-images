@@ -62,6 +62,9 @@ cd /home/container || { msg RED "Failed to change directory to /home/container."
 sleep 1
 
 export TZ=${TZ:-UTC}
+export MONGO_PORT=${MONGO_PORT:-27017}
+export MONGO_DB=${MONGO_DB:-botdb}
+export MONGO_URL=${MONGO_URL:-"mongodb://127.0.0.1:${MONGO_PORT}/${MONGO_DB}"}
 
 # Get internal IP with better error handling
 INTERNAL_IP=""
@@ -173,18 +176,17 @@ fi
 line BLUE
 # MongoDB startup
 mongod --dbpath /home/container/mongodb/ \
-       --port 27017 \
+       --port $MONGO_PORT \
        --bind_ip_all \
        --logpath /home/container/mongod.log \
        --logappend \
        --storageEngine wiredTiger \
        --wiredTigerCacheSizeGB 0.5 \
        --setParameter enableFlowControl=true \
-       --setParameter flowControlTargetLagSeconds=10 \
-       --setParameter mirrorReads="{samplingRate: 0.01}" > /dev/null 2>&1 &
+       --setParameter flowControlTargetLagSeconds=10 > /dev/null 2>&1 &
 
 sleep 2
-until nc -z -w5 127.0.0.1 27017; do
+until nc -z -w5 127.0.0.1 $MONGO_PORT; do
   echo 'Waiting for MongoDB connection...'
   sleep 3
 done
@@ -200,11 +202,11 @@ msg YELLOW "Setting MongoDB Feature Compatibility Version to $MONGO_VERSION..."
 
 # Check and set FCV using mongosh
 if command -v mongosh &> /dev/null; then
-    CURRENT_FCV=$(mongosh --quiet --eval "db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 }).featureCompatibilityVersion.version" 2>/dev/null || echo "unknown")
+    CURRENT_FCV=$(mongosh --quiet --port $MONGO_PORT --eval "db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 }).featureCompatibilityVersion.version" 2>/dev/null || echo "unknown")
 
     if [ "$CURRENT_FCV" != "$MONGO_VERSION" ] && [ "$CURRENT_FCV" != "unknown" ]; then
         msg YELLOW "Current FCV: $CURRENT_FCV - Upgrading to $MONGO_VERSION..."
-        mongosh --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\", confirm: true })" 2>/dev/null && \
+        mongosh --quiet --port $MONGO_PORT --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\", confirm: true })" 2>/dev/null && \
             msg GREEN "✓ Feature Compatibility Version set to $MONGO_VERSION" || \
             msg YELLOW "⚠ Could not set FCV (might already be correct)"
     else
@@ -213,7 +215,7 @@ if command -v mongosh &> /dev/null; then
 else
     # Fallback to mongo shell if mongosh not available
     msg YELLOW "Using legacy mongo shell..."
-    mongo --quiet --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\", confirm: true })" 2>/dev/null && \
+    mongo --quiet --port $MONGO_PORT --eval "db.adminCommand({ setFeatureCompatibilityVersion: \"$MONGO_VERSION\", confirm: true })" 2>/dev/null && \
         msg GREEN "✓ Feature Compatibility Version set to $MONGO_VERSION" || \
         msg YELLOW "⚠ Could not verify/set FCV"
 fi
