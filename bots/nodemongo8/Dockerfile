@@ -70,14 +70,7 @@ RUN apt-get update && \
     && ln -sf /usr/local/bun/bin/bun /usr/local/bin/bun \
     # Locale configuration
     && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen \
-    # CleanUp: Build-Dependencies entfernen (aggressive cleanup)
-    && apt-get purge -y --auto-remove \
-        autoconf \
-        automake \
-        build-essential \
-        g++ \
-        libtool \
-        software-properties-common \
+    # Keep build-essential/make in image — required for native npm modules (e.g. canvas, sodium)
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* ~/.npm ~/.cache
 
