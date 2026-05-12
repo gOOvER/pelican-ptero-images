@@ -74,6 +74,7 @@ MONGO_PORT=$(find_free_port "${MONGO_PORT:-27017}")
 export MONGO_PORT
 export MONGO_DB=${MONGO_DB:-botdb}
 export MONGO_URL=${MONGO_URL:-"mongodb://127.0.0.1:${MONGO_PORT}/${MONGO_DB}"}
+echo "${MONGO_URL}" > /home/container/.mongo_url
 
 # Get internal IP with better error handling
 INTERNAL_IP=""
