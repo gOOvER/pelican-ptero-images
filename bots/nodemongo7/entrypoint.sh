@@ -48,6 +48,14 @@ cleanup() {
     mongod --shutdown --dbpath /home/container/mongodb/ 2>/dev/null || true
 }
 
+find_free_port() {
+    local port=${1:-27017}
+    while nc -z 127.0.0.1 "$port" 2>/dev/null; do
+        port=$((port + 1))
+    done
+    echo "$port"
+}
+
 # ----------------------------
 # Error trap
 # ----------------------------
@@ -62,7 +70,8 @@ cd /home/container || { msg RED "Failed to change directory to /home/container."
 sleep 1
 
 export TZ=${TZ:-UTC}
-export MONGO_PORT=${MONGO_PORT:-27017}
+MONGO_PORT=$(find_free_port "${MONGO_PORT:-27017}")
+export MONGO_PORT
 export MONGO_DB=${MONGO_DB:-botdb}
 export MONGO_URL=${MONGO_URL:-"mongodb://127.0.0.1:${MONGO_PORT}/${MONGO_DB}"}
 
