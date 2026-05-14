@@ -78,7 +78,5 @@ RUN         apt -y install --no-install-recommends \
 
 RUN         rm -rf /var/lib/apt/lists/*
 
-# updating npm
-RUN         npm install -g npm@latest --force
 RUN         npm install tsc typescript ts-node @types/node --location=global
 RUN 	    yarn global add itchio-downloader
