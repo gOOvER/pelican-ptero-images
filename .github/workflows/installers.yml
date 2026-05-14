@@ -30,6 +30,7 @@ jobs:
           - alpine
           - debian
           - nodejs
+          - nodejs22
           - python
           - python39
           - ubuntu
