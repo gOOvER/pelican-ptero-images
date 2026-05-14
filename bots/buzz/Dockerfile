@@ -30,7 +30,7 @@ RUN apt-get update && apt-get -y upgrade && \
         zip && \
     rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g npm@latest corepack && \
+RUN npm install -g corepack && \
     corepack enable && \
     corepack prepare pnpm@latest --activate && \
     corepack prepare yarn@stable --activate
