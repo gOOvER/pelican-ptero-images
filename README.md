@@ -497,6 +497,7 @@ periodically to ensure dependencies are always up-to-date.
 | bots:sogebot | `ghcr.io/goover/bots:sogebot` | ✅ | ✅ | SogeBot |
 | bots:nodemongo8 | `ghcr.io/goover/bots:nodemongo8` | ✅ | ❌ |
 | bots:nodemongo83 | `ghcr.io/goover/bots:nodemongo83` | ✅ | ❌ |
+| bots:buzz | `ghcr.io/goover/bots:buzz` | ✅ | ❌ |
 
 ---
 
