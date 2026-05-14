@@ -73,6 +73,8 @@ periodically to ensure dependencies are always up-to-date.
 | nodejs:20 | `ghcr.io/goover/nodejs:20` | ✅ | ✅ |
 | nodejs:22 | `ghcr.io/goover/nodejs:22` | ✅ | ✅ |
 | nodejs:24 | `ghcr.io/goover/nodejs:24` | ✅ | ✅ |
+| nodejs:25 | `ghcr.io/goover/nodejs:25` | ✅ | ✅ |
+| nodejs:26 | `ghcr.io/goover/nodejs:26` | ✅ | ✅ |
 
 ---
 
