@@ -683,12 +683,12 @@ if [ "${STREAM_LOGS:-1}" != "0" ]; then
 fi
 
 # Wait for server process
-# Temporarily disable set -e so a non-zero server exit code does not
-# trigger the ERR trap - the exit code is forwarded intentionally below.
+# Disable both errexit and the ERR trap so a non-zero server exit code does
+# not trigger the error handler - the exit code is forwarded intentionally below.
 set +e
+trap - ERR
 wait $SERVER_PID
 SERVER_EXIT=$?
-set -e
 
 # Cleanup log streaming if active
 if [ -n "${LOG_PID:-}" ]; then
