@@ -671,6 +671,12 @@ stream_game_logs() {
     done
 }
 
+# From here on the setup phase is complete.
+# Disable errexit and the ERR trap so the server process and its exit code
+# are handled manually – no unexpected error messages on normal server stop.
+set +e
+trap - ERR
+
 # Execute startup command with eval for proper shell expansion
 # Only environment variables and shell operators are processed, preventing code injection
 eval "$MODIFIED_STARTUP" &
@@ -683,10 +689,8 @@ if [ "${STREAM_LOGS:-1}" != "0" ]; then
 fi
 
 # Wait for server process
-# Use && / || pattern: bash explicitly does NOT fire the ERR trap for a command
-# that is not the last in a && or || list, so a non-zero server exit never
-# triggers the error handler regardless of set -e or trap ERR.
-wait "$SERVER_PID" && SERVER_EXIT=0 || SERVER_EXIT=$?
+wait "$SERVER_PID"
+SERVER_EXIT=$?
 
 # Cleanup log streaming if active
 if [ -n "${LOG_PID:-}" ]; then
