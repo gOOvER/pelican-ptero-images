@@ -683,12 +683,10 @@ if [ "${STREAM_LOGS:-1}" != "0" ]; then
 fi
 
 # Wait for server process
-# Disable both errexit and the ERR trap so a non-zero server exit code does
-# not trigger the error handler - the exit code is forwarded intentionally below.
-set +e
-trap - ERR
-wait $SERVER_PID
-SERVER_EXIT=$?
+# Use && / || pattern: bash explicitly does NOT fire the ERR trap for a command
+# that is not the last in a && or || list, so a non-zero server exit never
+# triggers the error handler regardless of set -e or trap ERR.
+wait "$SERVER_PID" && SERVER_EXIT=0 || SERVER_EXIT=$?
 
 # Cleanup log streaming if active
 if [ -n "${LOG_PID:-}" ]; then
