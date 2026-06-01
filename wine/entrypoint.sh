@@ -672,9 +672,9 @@ stream_game_logs() {
 }
 
 # From here on the setup phase is complete.
-# Disable errexit and the ERR trap so the server process and its exit code
+# Disable errexit, nounset and the ERR trap so the server process and its exit code
 # are handled manually – no unexpected error messages on normal server stop.
-set +e
+set +euo pipefail
 trap - ERR
 
 # Execute startup command with eval for proper shell expansion
