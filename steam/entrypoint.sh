@@ -165,17 +165,37 @@ export PROTON_CRASH_REPORT_DIR="$PROTON_LOG_DIR"
 export PROTON_NO_STEAM=1
 
 # ----------------------------
+# Detect Unity headless / batchmode server
+# ----------------------------
+# Unity dedicated server builds use -batchmode -nographics and require NO display.
+# Running with SDL_VIDEODRIVER=x11 or Xvfb causes Wine/SDL to block waiting for
+# an X11 connection that is never needed. Auto-detect and disable display subsystems.
+# Override by setting UNITY_BATCHMODE=0 or UNITY_BATCHMODE=1 explicitly.
+if [ -z "${UNITY_BATCHMODE:-}" ]; then
+    if echo "${STARTUP:-}" | grep -qi -- '-batchmode'; then
+        UNITY_BATCHMODE=1
+    else
+        UNITY_BATCHMODE=0
+    fi
+fi
+
+if [ "$UNITY_BATCHMODE" = "1" ]; then
+    info "Unity batchmode detected (-batchmode in STARTUP) - display subsystem disabled"
+fi
+
+# ----------------------------
 # Virtual display (Xvfb) for headless servers (no GPU/monitor)
 # ----------------------------
 # Xvfb provides a virtual framebuffer so SDL/Wine/DXVK can initialize
 # without a physical display. This is required on bare-metal game servers.
+# Skipped for Unity batchmode servers which need no display at all.
 DISPLAY="${DISPLAY:-:99}"
 export DISPLAY
 DISPLAY_WIDTH="${DISPLAY_WIDTH:-1024}"
 DISPLAY_HEIGHT="${DISPLAY_HEIGHT:-768}"
 DISPLAY_DEPTH="${DISPLAY_DEPTH:-24}"
 
-if command -v Xvfb >/dev/null 2>&1; then
+if [ "${UNITY_BATCHMODE:-0}" != "1" ] && command -v Xvfb >/dev/null 2>&1; then
     # Ensure the X11 socket directory exists; Xvfb cannot create it as non-root
     mkdir -p /tmp/.X11-unix 2>/dev/null || true
     if ! xdpyinfo -display "$DISPLAY" &>/dev/null 2>&1; then
@@ -194,7 +214,7 @@ if command -v Xvfb >/dev/null 2>&1; then
     else
         info "Virtual display $DISPLAY already available"
     fi
-else
+elif [ "${UNITY_BATCHMODE:-0}" != "1" ]; then
     warning "Xvfb not found - headless SDL/Wine apps may fail"
 fi
 
@@ -214,10 +234,27 @@ if [ -z "${VK_ICD_FILENAMES:-}" ]; then
     [ -n "$LVP_ICD" ] && export VK_ICD_FILENAMES="$LVP_ICD" && info "Software Vulkan ICD: $VK_ICD_FILENAMES"
 fi
 
-# SDL2 video driver: use x11 so SDL2-based Windows tools (e.g. xalia.exe) connect to Xvfb.
-# The dummy driver causes a PlatformNotSupportedException in Xalia's SDL windowing system.
-# Override with SDL_VIDEODRIVER=dummy if no X server is available.
-export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-x11}"
+# SDL2 video driver selection:
+# - x11:   required for Xalia (xalia.exe uses SDL's X11 backend for windowing).
+#          Without x11, Xalia throws PlatformNotSupportedException.
+# - dummy: correct for Unity dedicated server builds and any server that does not
+#          use SDL windowing. Proton itself uses SDL internally; forcing x11 makes
+#          Proton's SDL block until X11 is fully ready - causing hangs on servers
+#          that never need a display (e.g. Unity headless builds run via
+#          "proton run ./Server.exe -log").
+# Auto-select: use x11 only when xalia is detected in STARTUP; otherwise dummy.
+# Override with SDL_VIDEODRIVER=x11 or SDL_VIDEODRIVER=dummy in your server config.
+if [ -z "${SDL_VIDEODRIVER:-}" ]; then
+    if echo "${STARTUP:-}" | grep -qi 'xalia'; then
+        export SDL_VIDEODRIVER="x11"
+        info "SDL_VIDEODRIVER=x11 (xalia detected in STARTUP)"
+    else
+        export SDL_VIDEODRIVER="dummy"
+        info "SDL_VIDEODRIVER=dummy (no xalia in STARTUP; use SDL_VIDEODRIVER=x11 to override)"
+    fi
+else
+    export SDL_VIDEODRIVER
+fi
 
 # Suppress ALSA errors on headless servers without physical sound hardware.
 # SDL_AUDIODRIVER=dummy prevents SDL from attempting ALSA/PulseAudio initialization.
