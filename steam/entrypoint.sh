@@ -153,8 +153,9 @@ mkdir -p "$PROTON_LOG_DIR" "$SERVER_LOG_DIR" "$WINETRICKS_LOG_DIR"
 # Enable Proton logging for debugging
 export PROTON_LOG=1
 
-# Enable verbose Wine logging for crash diagnosis (can be overridden)
-export WINEDEBUG="${WINEDEBUG:-warn+all}"
+# Enable verbose Wine logging for crash diagnosis (can be overridden).
+# -dxgi suppresses headless EDID/display-metadata noise (no monitor attached).
+export WINEDEBUG="${WINEDEBUG:-warn+all,-dxgi}"
 
 # Track crashes and errors
 export PROTON_CRASH_REPORT_DIR="$PROTON_LOG_DIR"
@@ -212,10 +213,15 @@ if [ -z "${VK_ICD_FILENAMES:-}" ]; then
     [ -n "$LVP_ICD" ] && export VK_ICD_FILENAMES="$LVP_ICD" && info "Software Vulkan ICD: $VK_ICD_FILENAMES"
 fi
 
-# SDL2 video driver: use dummy/null backend so SDL2-based Windows tools (e.g. xalia.exe)
-# can initialize without a real display. Wine passes this env var through to Windows processes.
-# Override with SDL_VIDEODRIVER=x11 if a real X connection is needed.
-export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-dummy}"
+# SDL2 video driver: use x11 so SDL2-based Windows tools (e.g. xalia.exe) connect to Xvfb.
+# The dummy driver causes a PlatformNotSupportedException in Xalia's SDL windowing system.
+# Override with SDL_VIDEODRIVER=dummy if no X server is available.
+export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-x11}"
+
+# Suppress ALSA errors on headless servers without physical sound hardware.
+# SDL_AUDIODRIVER=dummy prevents SDL from attempting ALSA/PulseAudio initialization.
+export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
+export AUDIODEV="${AUDIODEV:-null}"
 
 # Suppress expected headless DXVK noise (OpenVR not installed, OpenXR not installed, no EDID).
 # Keep level at "error" so real DXVK errors are still visible.
