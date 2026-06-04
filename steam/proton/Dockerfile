@@ -118,6 +118,11 @@ RUN wget -q -O /usr/sbin/winetricks https://raw.githubusercontent.com/Winetricks
     https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks.bash-completion && \
     rm -rf /tmp/*
 
+# ALSA null device - headless servers have no sound hardware.
+# Without this, libasound2 logs a flood of "cannot find card '0'" errors
+# whenever Wine/Proton attempts to open the default PCM device.
+RUN printf 'pcm.!default {\n    type null\n}\nctl.!default {\n    type null\n}\n' > /etc/asound.conf
+
 # Set locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 ENV LANG=en_US.UTF-8

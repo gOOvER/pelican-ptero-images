@@ -154,8 +154,9 @@ mkdir -p "$PROTON_LOG_DIR" "$SERVER_LOG_DIR" "$WINETRICKS_LOG_DIR"
 export PROTON_LOG=1
 
 # Enable verbose Wine logging for crash diagnosis (can be overridden).
-# -dxgi suppresses headless EDID/display-metadata noise (no monitor attached).
-export WINEDEBUG="${WINEDEBUG:-warn+all,-dxgi}"
+# err-dxgi + -dxgi suppresses both err: and warn: EDID/display-metadata noise
+# on headless servers without a monitor. Set WINEDEBUG=+all to restore full output.
+export WINEDEBUG="${WINEDEBUG:-warn+all,err-dxgi,-dxgi}"
 
 # Track crashes and errors
 export PROTON_CRASH_REPORT_DIR="$PROTON_LOG_DIR"
@@ -235,9 +236,12 @@ export DXVK_ENABLE_NVAPI="${DXVK_ENABLE_NVAPI:-0}"
 # Note: NTSync is automatically enabled by modern Wine versions (>= 8.0) on kernel >= 6.14 with CONFIG_NTSYNC
 # No manual configuration needed
 
-# Enable Proton-GE's protonfixes system for automatic game-specific fixes (enabled by default)
-# Set PROTON_USE_PROTONFIXES=0 in your container configuration to disable
-if [ "${PROTON_USE_PROTONFIXES:-1}" != "0" ]; then
+# Proton-GE's protonfixes applies per-game compatibility fixes.
+# Disabled by default for dedicated servers: protonfixes checks for a running
+# Steam client (STEAM_COMPAT_CLIENT_INSTALL_PATH) and when PROTON_NO_STEAM=1 is
+# set it detects a "unit test" environment and spams harmless but noisy WARNs.
+# Set PROTON_USE_PROTONFIXES=1 in your server config to enable it explicitly.
+if [ "${PROTON_USE_PROTONFIXES:-0}" = "1" ]; then
     export PROTON_USE_PROTONFIXES=1
 
     # Protonfixes requires a home directory for its script cache and configuration
@@ -682,16 +686,12 @@ stream_game_logs() {
 
 # Execute startup command - eval is required to handle quoted args and shell operators.
 # STARTUP is set by the panel (trusted source), not directly by end-users.
-# Full output is captured in the log file; known harmless headless-mode noise
-# (caught Xalia SDL exceptions, DXVK EDID/colorimetry errors) is filtered from
-# the terminal so real errors remain visible. Set SUPPRESS_HEADLESS_NOISE=0 to
-# see the raw output.
-_NOISE_FILTER='readMonitorEdidFromKey|colorimetry info, using blank|EXCEPTION handling.*PlatformNotSupport|PlatformNotSupportedException.*Video driver|at Xalia\.(Sdl|Ui|Main|Gudl)'
-if [ "${SUPPRESS_HEADLESS_NOISE:-1}" = "1" ]; then
-    eval "$MODIFIED_STARTUP" 2>&1 | tee -a "$SERVER_LOG" | grep --line-buffered -v -E "$_NOISE_FILTER" &
-else
-    eval "$MODIFIED_STARTUP" 2>&1 | tee -a "$SERVER_LOG" &
-fi
+# Process substitution (> >(...)) is used instead of a pipe so that $! captures
+# the actual server PID rather than tee's PID. A pipe would cause $! to point at
+# tee/grep, making kill/wait unreliable and potentially deadlocking when pipe
+# buffers fill. Headless noise (ALSA, DXGI, Xalia) is already suppressed via
+# WINEDEBUG, DXVK_LOG_LEVEL and /etc/asound.conf - no grep filter needed.
+eval "$MODIFIED_STARTUP" > >(tee -a "$SERVER_LOG") 2>&1 &
 SERVER_PID=$!
 
 # Validate that the process was actually started
