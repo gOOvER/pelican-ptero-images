@@ -34,6 +34,7 @@ RUN dpkg --add-architecture i386 && \
     wget \
     winbind \
     x11-xserver-utils \
+    xserver-xorg-video-dummy \
     xvfb \
     lib32gcc-s1 \
     libasound2 \
@@ -115,9 +116,47 @@ ENV LC_ALL=en_US.UTF-8
 
 # Virtual display for headless Proton/Wine (xalia, SDL-based apps)
 ENV DISPLAY=:99
-ENV DISPLAY_WIDTH=1024
-ENV DISPLAY_HEIGHT=768
+ENV DISPLAY_WIDTH=1920
+ENV DISPLAY_HEIGHT=1080
 ENV DISPLAY_DEPTH=24
+
+# Xorg dummy driver configuration for headless virtual display.
+# Xvfb does not register RandR outputs, so SDL3 (used by Xalia and others)
+# returns 0 displays and throws "No displays available". Xorg with the dummy
+# driver creates a proper connected RandR output that SDL3 can enumerate.
+# Xwrapper.config allows non-root users to start Xorg (no hardware access
+# is needed with the dummy driver, so root rights are not required).
+RUN printf 'allowed_users=anybody\nneeds_root_rights=no\n' > /etc/X11/Xwrapper.config && \
+    mkdir -p /etc/X11/xorg.conf.d && \
+    printf '%s\n' \
+        'Section "ServerFlags"' \
+        '    Option "DontVTSwitch"      "true"' \
+        '    Option "AllowMouseOpenFail" "true"' \
+        '    Option "PciForceNone"      "true"' \
+        '    Option "AutoEnableDevices" "false"' \
+        '    Option "AutoAddDevices"    "false"' \
+        'EndSection' '' \
+        'Section "Device"' \
+        '    Identifier "Virtual Display Device"' \
+        '    Driver     "dummy"' \
+        '    VideoRam   256000' \
+        'EndSection' '' \
+        'Section "Monitor"' \
+        '    Identifier "Virtual Monitor"' \
+        '    HorizSync   28.0-80.0' \
+        '    VertRefresh 48.0-75.0' \
+        'EndSection' '' \
+        'Section "Screen"' \
+        '    Identifier "Virtual Screen"' \
+        '    Device     "Virtual Display Device"' \
+        '    Monitor    "Virtual Monitor"' \
+        '    DefaultDepth 24' \
+        '    SubSection "Display"' \
+        '        Depth 24' \
+        '        Modes "1920x1080" "1280x720" "1024x768"' \
+        '    EndSubSection' \
+        'EndSection' \
+    > /etc/X11/xorg.conf.d/20-virtual-display.conf
 
 # RCON CLI installation (latest release) - uses jq for reliable parsing
 RUN set -eux; cd /tmp; \

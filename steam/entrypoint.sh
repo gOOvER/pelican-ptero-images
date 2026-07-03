@@ -195,22 +195,53 @@ DISPLAY_WIDTH="${DISPLAY_WIDTH:-1024}"
 DISPLAY_HEIGHT="${DISPLAY_HEIGHT:-768}"
 DISPLAY_DEPTH="${DISPLAY_DEPTH:-24}"
 
-if [ "${UNITY_BATCHMODE:-0}" != "1" ] && command -v Xvfb >/dev/null 2>&1; then
-    # Ensure the X11 socket directory exists; Xvfb cannot create it as non-root
+if [ "${UNITY_BATCHMODE:-0}" != "1" ]; then
+    # Ensure the X11 socket directory exists
     mkdir -p /tmp/.X11-unix 2>/dev/null || true
-    if ! xdpyinfo -display "$DISPLAY" &>/dev/null 2>&1; then
-        info "Starting Xvfb on display $DISPLAY (${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH})"
-        # -ac disables access control so Wine/SDL2 can connect without Xauthority
-        # stderr goes to log file to avoid _XSERVTransmkdir noise on non-root containers
-        Xvfb "$DISPLAY" -screen 0 "${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH}" -nolisten tcp -ac \
-            2>"$BASE_LOG_DIR/xvfb.log" &
-        XVFB_PID=$!
-        sleep 1
-        if kill -0 "$XVFB_PID" 2>/dev/null; then
-            success "Xvfb started (PID: $XVFB_PID)"
-        else
-            warning "Xvfb failed to start - continuing anyway"
+    if ! xrandr --display "$DISPLAY" &>/dev/null 2>&1; then
+        DISPLAY_STARTED=0
+
+        # Prefer Xorg with dummy driver: it registers a connected RandR output
+        # so SDL3 can enumerate displays. Xvfb only creates a screen without
+        # any RandR output, causing SDL3 to return 0 displays and making apps
+        # like Xalia throw "No displays available" on initialisation.
+        # Xwrapper.config (needs_root_rights=no) allows the non-root container
+        # user to start Xorg since the dummy driver needs no hardware access.
+        if command -v Xorg >/dev/null 2>&1 && [ -f /etc/X11/xorg.conf.d/20-virtual-display.conf ]; then
+            info "Starting Xorg (dummy driver) on display $DISPLAY..."
+            Xorg -nolisten tcp -noreset -novtswitch -ac "$DISPLAY" \
+                2>"$BASE_LOG_DIR/xorg.log" &
+            XVFB_PID=$!
+            sleep 2
+            if kill -0 "$XVFB_PID" 2>/dev/null && xrandr --display "$DISPLAY" &>/dev/null 2>&1; then
+                success "Xorg dummy display started (PID: $XVFB_PID)"
+                DISPLAY_STARTED=1
+            else
+                warning "Xorg dummy failed to start — falling back to Xvfb"
+                kill "$XVFB_PID" 2>/dev/null || true
+                wait "$XVFB_PID" 2>/dev/null || true
+                XVFB_PID=""
+            fi
         fi
+
+        # Fall back to Xvfb (SDL2/Wine work without RandR outputs)
+        if [ "$DISPLAY_STARTED" = "0" ] && command -v Xvfb >/dev/null 2>&1; then
+            info "Starting Xvfb on display $DISPLAY (${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH})"
+            # -ac disables access control so Wine/SDL can connect without Xauthority
+            Xvfb "$DISPLAY" -screen 0 "${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}x${DISPLAY_DEPTH}" \
+                -nolisten tcp -ac \
+                2>"$BASE_LOG_DIR/xvfb.log" &
+            XVFB_PID=$!
+            sleep 1
+            if kill -0 "$XVFB_PID" 2>/dev/null; then
+                success "Xvfb started (PID: $XVFB_PID)"
+                DISPLAY_STARTED=1
+            else
+                warning "Xvfb failed to start — continuing anyway"
+            fi
+        fi
+
+        [ "$DISPLAY_STARTED" = "0" ] && warning "No virtual display server available — headless SDL/Wine apps may fail"
     else
         info "Virtual display $DISPLAY already available"
     fi
@@ -254,32 +285,6 @@ if [ -z "${SDL_VIDEODRIVER:-}" ]; then
     fi
 else
     export SDL_VIDEODRIVER
-fi
-
-# SDL3 RandR virtual-output fix for Xalia / headless X11.
-# SDL3 enumerates displays via RandR *outputs*, not just screens.
-# Xvfb creates a framebuffer screen but registers no connected output by default,
-# so SDL3_GetDisplays() returns 0 and apps like Xalia abort with
-# "No displays available". Fix: activate the first available RandR output
-# at the configured resolution so SDL3 can find at least one display.
-if [ "${SDL_VIDEODRIVER:-}" = "x11" ] && command -v xrandr >/dev/null 2>&1; then
-    # Find the first connected output, or fall back to the first disconnected one
-    OUTPUT=$(xrandr --display "$DISPLAY" 2>/dev/null \
-        | awk '/^[A-Z][^ ]* connected/{print $1; exit}
-               /^[A-Z][^ ]* disconnected/{last=$1}
-               END{if (last) print last}')
-    if [ -n "$OUTPUT" ]; then
-        if xrandr --display "$DISPLAY" --output "$OUTPUT" \
-               --mode "${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}" 2>/dev/null; then
-            info "Xvfb RandR: $OUTPUT → ${DISPLAY_WIDTH}x${DISPLAY_HEIGHT} (SDL3 display fix)"
-        elif xrandr --display "$DISPLAY" --output "$OUTPUT" --auto 2>/dev/null; then
-            info "Xvfb RandR: $OUTPUT → auto (SDL3 display fix)"
-        else
-            warning "Could not configure RandR output $OUTPUT — Xalia may fail with 'No displays available'"
-        fi
-    else
-        warning "No RandR output found on $DISPLAY — Xalia may fail with 'No displays available'"
-    fi
 fi
 
 # Suppress ALSA errors on headless servers without physical sound hardware.

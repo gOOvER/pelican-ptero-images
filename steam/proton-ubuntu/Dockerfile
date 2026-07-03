@@ -32,6 +32,7 @@ RUN dpkg --add-architecture i386 \
         wget \
         winbind \
         x11-xserver-utils \
+        xserver-xorg-video-dummy \
         xvfb \
         lib32gcc-s1 \
         libasound2t64 \
@@ -60,8 +61,39 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
-# -----------------------------
-# Create container user
+# Xorg dummy driver configuration — same rationale as proton/Dockerfile:
+# SDL3 needs a connected RandR output which Xvfb cannot provide.
+RUN printf 'allowed_users=anybody\nneeds_root_rights=no\n' > /etc/X11/Xwrapper.config && \
+    mkdir -p /etc/X11/xorg.conf.d && \
+    printf '%s\n' \
+        'Section "ServerFlags"' \
+        '    Option "DontVTSwitch"      "true"' \
+        '    Option "AllowMouseOpenFail" "true"' \
+        '    Option "PciForceNone"      "true"' \
+        '    Option "AutoEnableDevices" "false"' \
+        '    Option "AutoAddDevices"    "false"' \
+        'EndSection' '' \
+        'Section "Device"' \
+        '    Identifier "Virtual Display Device"' \
+        '    Driver     "dummy"' \
+        '    VideoRam   256000' \
+        'EndSection' '' \
+        'Section "Monitor"' \
+        '    Identifier "Virtual Monitor"' \
+        '    HorizSync   28.0-80.0' \
+        '    VertRefresh 48.0-75.0' \
+        'EndSection' '' \
+        'Section "Screen"' \
+        '    Identifier "Virtual Screen"' \
+        '    Device     "Virtual Display Device"' \
+        '    Monitor    "Virtual Monitor"' \
+        '    DefaultDepth 24' \
+        '    SubSection "Display"' \
+        '        Depth 24' \
+        '        Modes "1920x1080" "1280x720" "1024x768"' \
+        '    EndSubSection' \
+        'EndSection' \
+    > /etc/X11/xorg.conf.d/20-virtual-display.conf
 # -----------------------------
 RUN useradd -m -d /home/container -s /bin/bash container
 USER container
