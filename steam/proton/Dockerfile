@@ -77,9 +77,12 @@ RUN dpkg --add-architecture i386 && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
 
 # Download and install Proton-GE latest release into /opt and register with Steam
+ARG GITHUB_TOKEN=""
 RUN set -eux; cd /tmp; \
-    # Fetch release JSON using curl (already installed in layer 1)
-    PROTON_JSON=$(curl -sSf https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest 2>&1) || { echo "Failed to fetch Proton-GE releases" >&2; exit 1; }; \
+    # Fetch release JSON - use GITHUB_TOKEN if available to avoid API rate limiting (403)
+    curl_args=(-sSf); \
+    [ -n "${GITHUB_TOKEN:-}" ] && curl_args+=(-H "Authorization: Bearer ${GITHUB_TOKEN}"); \
+    PROTON_JSON=$(curl "${curl_args[@]}" https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest 2>&1) || { echo "Failed to fetch Proton-GE releases" >&2; exit 1; }; \
     # Extract .tar.gz URL using jq (installed in layer 1)
     PROTON_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[].browser_download_url' 2>/dev/null | grep '\.tar\.gz$' | head -n1) || { echo "Failed to parse Proton-GE release JSON" >&2; exit 1; }; \
     [ -n "$PROTON_URL" ] || { echo "No Proton-GE .tar.gz found in latest release" >&2; exit 1; }; \

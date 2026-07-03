@@ -102,9 +102,12 @@ ENV PATH="$HOME/.local/bin:$PATH"
 # -----------------------------
 # Proton-GE installation (global)
 # -----------------------------
+ARG GITHUB_TOKEN=""
 USER root
 RUN set -eux; cd /tmp; \
-    PROTON_JSON=$(curl -sSf https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest) || { echo "Failed to fetch Proton-GE releases" >&2; exit 1; }; \
+    curl_args=(-sSf); \
+    [ -n "${GITHUB_TOKEN:-}" ] && curl_args+=(-H "Authorization: Bearer ${GITHUB_TOKEN}"); \
+    PROTON_JSON=$(curl "${curl_args[@]}" https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest) || { echo "Failed to fetch Proton-GE releases" >&2; exit 1; }; \
     PROTON_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[].browser_download_url' | grep '\.tar\.gz$' | head -n1) || { echo "Failed to parse Proton-GE release JSON" >&2; exit 1; }; \
     [ -n "$PROTON_URL" ] || { echo "No Proton-GE .tar.gz found in latest release" >&2; exit 1; }; \
     curl -sSL "$PROTON_URL" -o proton-ge.tar.gz || { echo "Failed to download Proton-GE from $PROTON_URL" >&2; exit 1; }; \
@@ -112,7 +115,7 @@ RUN set -eux; cd /tmp; \
     rm -rf proton-ge.tar.gz /tmp/*; \
     ln -sf /opt/ProtonGE/proton /usr/local/bin/proton-ge; \
     ln -sf /opt/ProtonGE/proton /usr/local/bin/proton; \
-    && ln -sf /home/container/.proton-dist.lock /opt/ProtonGE/dist.lock
+    ln -sf /home/container/.proton-dist.lock /opt/ProtonGE/dist.lock
 
 # -----------------------------
 # Winetricks installation (global)

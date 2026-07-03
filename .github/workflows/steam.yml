@@ -51,6 +51,7 @@ jobs:
           push: true
           network: host
           tags: ghcr.io/goover/steam:${{ matrix.distro }}
+          build-args: GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
