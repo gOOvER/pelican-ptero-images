@@ -1,7 +1,7 @@
 # ---------------------------------------------
 # Steam Proton-GE image (with Protontricks)
 # ---------------------------------------------
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 LABEL org.opencontainers.image.description="STEAM Proton-GE Image for Pelican/Pterodactyl Gamepanel"
 LABEL org.opencontainers.image.authors="info@goover.de"
@@ -59,7 +59,7 @@ RUN dpkg --add-architecture i386 \
         libfreetype6:i386 \
         lib32gcc-s1 \
         libgdiplus \
-        libncurses5-dev:i386 \
+        libncurses-dev:i386 \
         libncurses6 \
         libssl3 \
         libssl3:i386 \
@@ -79,6 +79,7 @@ RUN dpkg --add-architecture i386 \
         gstreamer1.0-alsa \
         gstreamer1.0-gl \
         gstreamer1.0-pulseaudio \
+        jq \
     && apt clean && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
@@ -102,15 +103,16 @@ ENV PATH="$HOME/.local/bin:$PATH"
 # Proton-GE installation (global)
 # -----------------------------
 USER root
-RUN mkdir -p /opt/ProtonGE /usr/local/bin && cd /tmp \
-    && PROTON_URL=$(curl -s https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest \
-        | grep browser_download_url | cut -d\" -f4 | grep '\.tar\.gz$') \
-    && curl -sLOJ "$PROTON_URL" \
-    && tar -xzf GE-Proton*.tar.gz -C /opt/ProtonGE --strip-components=1 \
-    && rm GE-Proton*.* \
-    && ln -sf /opt/ProtonGE/proton /usr/local/bin/proton-ge \
-    && ln -sf /opt/ProtonGE/proton /usr/local/bin/proton \
-    && touch /opt/ProtonGE/dist.lock && chmod 666 /opt/ProtonGE/dist.lock
+RUN set -eux; cd /tmp; \
+    PROTON_JSON=$(curl -sSf https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest) || { echo "Failed to fetch Proton-GE releases" >&2; exit 1; }; \
+    PROTON_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[].browser_download_url' | grep '\.tar\.gz$' | head -n1) || { echo "Failed to parse Proton-GE release JSON" >&2; exit 1; }; \
+    [ -n "$PROTON_URL" ] || { echo "No Proton-GE .tar.gz found in latest release" >&2; exit 1; }; \
+    curl -sSL "$PROTON_URL" -o proton-ge.tar.gz || { echo "Failed to download Proton-GE from $PROTON_URL" >&2; exit 1; }; \
+    mkdir -p /opt/ProtonGE /usr/local/bin && tar -xzf proton-ge.tar.gz -C /opt/ProtonGE --strip-components=1; \
+    rm -rf proton-ge.tar.gz /tmp/*; \
+    ln -sf /opt/ProtonGE/proton /usr/local/bin/proton-ge; \
+    ln -sf /opt/ProtonGE/proton /usr/local/bin/proton; \
+    touch /opt/ProtonGE/dist.lock && chmod 666 /opt/ProtonGE/dist.lock
 
 # -----------------------------
 # Winetricks installation (global)
