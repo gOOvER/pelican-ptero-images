@@ -190,11 +190,17 @@ RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 # (root filesystem is read-only; /tmp is not mounted; only /home/container is writable).
 RUN ln -sf /home/container/.proton-dist.lock /opt/ProtonGE/dist.lock
 
-# GE-Proton11 ships files/bin/wine as the 32-bit wine preloader binary, which fails with
-# ENOEXEC on kernels/containers without IA-32 execution support. Replace with wine64
-# (the 64-bit wine binary — functionally identical in WOW64 mode on x86_64 hosts).
-RUN [ -f /opt/ProtonGE/files/bin/wine64 ] && \
-    ln -sf wine64 /opt/ProtonGE/files/bin/wine || true
+# GE-Proton11 uses a unified 64-bit wine binary (no wine64 — it's obsolete).
+# The wine architecture is now defined via the prefix; default is x64.
+# files/bin/wine may be a shell script without a shebang, which causes Python
+# 3.12+ posix_spawn to return ENOEXEC (older Python fell back to /bin/sh).
+# Replace with an explicit wrapper that has a shebang and calls the preloader.
+RUN if [ -f /opt/ProtonGE/files/lib/wine/x86_64-unix/wine-preloader ] && \
+       [ -f /opt/ProtonGE/files/lib/wine/x86_64-unix/wine ]; then \
+        printf '#!/bin/sh\nBD="$(dirname "$(readlink -f "$0")")"\nexec "${BD}/../lib/wine/x86_64-unix/wine-preloader" "${BD}/../lib/wine/x86_64-unix/wine" "$@"\n' \
+            > /opt/ProtonGE/files/bin/wine && \
+        chmod +x /opt/ProtonGE/files/bin/wine; \
+    fi
 
 # GE-Proton11 no longer bundles a pre-built default_pfx in the release tarball.
 # On first run proton calls wine wineboot and writes to files/share/default_pfx/ —
