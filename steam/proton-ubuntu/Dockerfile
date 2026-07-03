@@ -31,9 +31,10 @@ RUN dpkg --add-architecture i386 \
         tini \
         wget \
         winbind \
+        x11-xserver-utils \
         xvfb \
         lib32gcc-s1 \
-        libasound2 \
+        libasound2t64 \
         libfreetype6 \
         libfreetype6:i386 \
         libsdl2-2.0-0 \

@@ -256,6 +256,32 @@ else
     export SDL_VIDEODRIVER
 fi
 
+# SDL3 RandR virtual-output fix for Xalia / headless X11.
+# SDL3 enumerates displays via RandR *outputs*, not just screens.
+# Xvfb creates a framebuffer screen but registers no connected output by default,
+# so SDL3_GetDisplays() returns 0 and apps like Xalia abort with
+# "No displays available". Fix: activate the first available RandR output
+# at the configured resolution so SDL3 can find at least one display.
+if [ "${SDL_VIDEODRIVER:-}" = "x11" ] && command -v xrandr >/dev/null 2>&1; then
+    # Find the first connected output, or fall back to the first disconnected one
+    OUTPUT=$(xrandr --display "$DISPLAY" 2>/dev/null \
+        | awk '/^[A-Z][^ ]* connected/{print $1; exit}
+               /^[A-Z][^ ]* disconnected/{last=$1}
+               END{if (last) print last}')
+    if [ -n "$OUTPUT" ]; then
+        if xrandr --display "$DISPLAY" --output "$OUTPUT" \
+               --mode "${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}" 2>/dev/null; then
+            info "Xvfb RandR: $OUTPUT → ${DISPLAY_WIDTH}x${DISPLAY_HEIGHT} (SDL3 display fix)"
+        elif xrandr --display "$DISPLAY" --output "$OUTPUT" --auto 2>/dev/null; then
+            info "Xvfb RandR: $OUTPUT → auto (SDL3 display fix)"
+        else
+            warning "Could not configure RandR output $OUTPUT — Xalia may fail with 'No displays available'"
+        fi
+    else
+        warning "No RandR output found on $DISPLAY — Xalia may fail with 'No displays available'"
+    fi
+fi
+
 # Suppress ALSA errors on headless servers without physical sound hardware.
 # SDL_AUDIODRIVER=dummy prevents SDL from attempting ALSA/PulseAudio initialization.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"

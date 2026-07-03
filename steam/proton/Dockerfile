@@ -33,6 +33,7 @@ RUN dpkg --add-architecture i386 && \
     tini \
     wget \
     winbind \
+    x11-xserver-utils \
     xvfb \
     lib32gcc-s1 \
     libasound2 \
