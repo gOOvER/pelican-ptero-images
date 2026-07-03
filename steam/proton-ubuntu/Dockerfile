@@ -109,7 +109,8 @@ RUN mkdir -p /opt/ProtonGE /usr/local/bin && cd /tmp \
     && tar -xzf GE-Proton*.tar.gz -C /opt/ProtonGE --strip-components=1 \
     && rm GE-Proton*.* \
     && ln -sf /opt/ProtonGE/proton /usr/local/bin/proton-ge \
-    && ln -sf /opt/ProtonGE/proton /usr/local/bin/proton
+    && ln -sf /opt/ProtonGE/proton /usr/local/bin/proton \
+    && touch /opt/ProtonGE/dist.lock && chmod 666 /opt/ProtonGE/dist.lock
 
 # -----------------------------
 # Winetricks installation (global)

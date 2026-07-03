@@ -183,6 +183,11 @@ RUN set -eux; \
 # Pre-create X11 socket directory as root with sticky bit so Xvfb can run as non-root
 RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 
+# Pre-create Proton dist.lock so the container user can acquire the lock at runtime.
+# Proton's make_default_prefix() opens /opt/ProtonGE/dist.lock for exclusive locking;
+# without this the non-root container user gets OSError EROFS (errno 30).
+RUN touch /opt/ProtonGE/dist.lock && chmod 666 /opt/ProtonGE/dist.lock
+
 # Create non-root user and set working directory
 RUN useradd -m -d /home/container -s /bin/bash container && mkdir -p /home/container && chown container:container /home/container
 ENV USER=container HOME=/home/container
