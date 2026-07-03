@@ -190,29 +190,33 @@ RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 # (root filesystem is read-only; /tmp is not mounted; only /home/container is writable).
 RUN ln -sf /home/container/.proton-dist.lock /opt/ProtonGE/dist.lock
 
-# GE-Proton11 uses a unified 64-bit wine binary (no wine64 — it's obsolete).
-# Python 3.13's posix_spawn does NOT fall back to /bin/sh for scripts without
-# a shebang — it returns ENOEXEC immediately. Fix: if files/bin/wine is a
-# shell script lacking a shebang, prepend #!/bin/sh. The script already knows
-# the correct internal wine binary paths; we only need to make it executable
-# by posix_spawn without guessing GE-Proton release-specific binary paths.
+# Python 3.13 posix_spawn ENOEXEC fix for files/bin/wine.
+# posix_spawn does NOT fall back to /bin/sh for scripts without a shebang —
+# it returns ENOEXEC immediately (unlike the old fork+exec path in Python ≤3.12).
+# Use `file -b` for reliable ELF detection instead of od|grep, and log every
+# branch so the build output shows exactly what was (or wasn't) patched.
 RUN set -eu; \
     WINE_BIN=/opt/ProtonGE/files/bin/wine; \
-    if [ -f "$WINE_BIN" ] && \
-       ! od -A n -t x1 -N 4 "$WINE_BIN" | grep -q '7f 45 4c 46' && \
-       [ "$(head -c2 "$WINE_BIN")" != '#!' ]; then \
-        echo "Prepending #!/bin/sh shebang to $WINE_BIN (Python 3.13 ENOEXEC fix)"; \
-        { printf '#!/bin/sh\n'; cat "$WINE_BIN"; } > "${WINE_BIN}.new" && \
-        mv "${WINE_BIN}.new" "$WINE_BIN" && \
-        chmod +x "$WINE_BIN"; \
+    if [ ! -f "$WINE_BIN" ]; then \
+        echo "WARN: $WINE_BIN not found — ProtonGE layout may have changed" >&2; \
+        ls -la /opt/ProtonGE/files/bin/ >&2 || true; \
+    elif file -b "$WINE_BIN" | grep -q '^ELF'; then \
+        echo "files/bin/wine is an ELF binary — posix_spawn exec OK, no patch needed"; \
+    elif [ "$(head -c2 "$WINE_BIN")" = '#!' ]; then \
+        echo "files/bin/wine already has shebang: $(head -n1 "$WINE_BIN") — no patch needed"; \
+    else \
+        echo "files/bin/wine is a script without shebang — prepending #!/bin/sh (Python 3.13 ENOEXEC fix)"; \
+        { printf '#!/bin/sh\n'; cat "$WINE_BIN"; } > "${WINE_BIN}.new" \
+            && mv "${WINE_BIN}.new" "$WINE_BIN" \
+            && chmod +x "$WINE_BIN"; \
+        echo "Patched. First line is now: $(head -n1 "$WINE_BIN")"; \
     fi
 
 # GE-Proton11 no longer bundles a pre-built default_pfx in the release tarball.
 # On first run proton calls wine wineboot and writes to files/share/default_pfx/ —
 # but that path is inside the read-only image layer in Pelican/Pterodactyl.
 # Redirect to /home/container/.proton-default-pfx (writable persistent volume).
-RUN if [ ! -d /opt/ProtonGE/files/share/default_pfx ] && \
-       [ ! -L /opt/ProtonGE/files/share/default_pfx ]; then \
+RUN if [ ! -d /opt/ProtonGE/files/share/default_pfx ] && [ ! -L /opt/ProtonGE/files/share/default_pfx ]; then \
         mkdir -p /opt/ProtonGE/files/share && \
         ln -sf /home/container/.proton-default-pfx \
             /opt/ProtonGE/files/share/default_pfx; \
