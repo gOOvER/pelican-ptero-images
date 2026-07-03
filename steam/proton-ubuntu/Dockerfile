@@ -112,7 +112,7 @@ RUN set -eux; cd /tmp; \
     rm -rf proton-ge.tar.gz /tmp/*; \
     ln -sf /opt/ProtonGE/proton /usr/local/bin/proton-ge; \
     ln -sf /opt/ProtonGE/proton /usr/local/bin/proton; \
-    touch /opt/ProtonGE/dist.lock && chmod 666 /opt/ProtonGE/dist.lock
+    && ln -sf /home/container/.proton-dist.lock /opt/ProtonGE/dist.lock
 
 # -----------------------------
 # Winetricks installation (global)
