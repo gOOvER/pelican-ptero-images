@@ -17,69 +17,38 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN dpkg --add-architecture i386 \
     && apt update && apt -y upgrade \
     && apt install -y --no-install-recommends \
-        nala \
         ca-certificates \
+        cabextract \
         curl \
+        dbus \
         file \
-        git \
-        gnupg \
-        gnupg2 \
-        gnutls-bin \
-        iproute2 \
+        jq \
         locales \
-        net-tools \
-        netcat-openbsd \
+        numactl \
         openssl \
-        pulseaudio \
-        wget \
-        xauth \
-        xvfb \
+        python3 \
         tar \
         tini \
-        virt-what \
-        yad \
-        alsa-tools \
-        ffmpeg \
-        mesa-utils \
-        libao-common \
-        libpulse-dev \
-        libpulse0 \
-        python3 \
-        python3-pip \
-        python3-setuptools \
-        python3-venv \
-        pipx \
-        cabextract \
+        wget \
         winbind \
-        libsdl1.2debian \
-        libsdl1.2debian:i386 \
-        libsdl2-2.0-0 \
-        libsdl2-2.0-0:i386 \
+        xvfb \
+        lib32gcc-s1 \
+        libasound2 \
         libfreetype6 \
         libfreetype6:i386 \
-        lib32gcc-s1 \
-        libgdiplus \
-        libncurses-dev:i386 \
-        libncurses6 \
+        libsdl2-2.0-0 \
+        libsdl2-2.0-0:i386 \
         libssl3 \
         libssl3:i386 \
+        libgdiplus \
+        libncurses6 \
         libntlm0 \
         libnss-wrapper \
         libnss3 \
-        libgstreamer1.0-dev \
-        libgstreamer-plugins-base1.0-dev \
-        libgstreamer-plugins-bad1.0-dev \
-        gstreamer1.0-plugins-base \
-        gstreamer1.0-plugins-good \
-        gstreamer1.0-plugins-bad \
-        gstreamer1.0-plugins-ugly \
-        gstreamer1.0-libav \
-        gstreamer1.0-tools \
-        gstreamer1.0-x \
-        gstreamer1.0-alsa \
-        gstreamer1.0-gl \
-        gstreamer1.0-pulseaudio \
-        jq \
+        libpulse-dev \
+        libpulse0 \
+        mesa-vulkan-drivers \
+        mesa-vulkan-drivers:i386 \
     && apt clean && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
@@ -108,8 +77,12 @@ RUN set -eux; cd /tmp; \
     curl_args=(-sSf); \
     [ -n "${GITHUB_TOKEN:-}" ] && curl_args+=(-H "Authorization: Bearer ${GITHUB_TOKEN}"); \
     PROTON_JSON=$(curl "${curl_args[@]}" https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest) || { echo "Failed to fetch Proton-GE releases" >&2; exit 1; }; \
-    PROTON_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[].browser_download_url' | grep '\.tar\.gz$' | head -n1) || { echo "Failed to parse Proton-GE release JSON" >&2; exit 1; }; \
-    [ -n "$PROTON_URL" ] || { echo "No Proton-GE .tar.gz found in latest release" >&2; exit 1; }; \
+    # Extract x86_64 .tar.gz URL - match only bare "GE-ProtonXX-Y.tar.gz" (no arch suffix)
+    # GE-Proton11-1 introduced separate aarch64 builds; without this filter
+    # head -n1 would grab the aarch64 tarball first (it appears earlier in the API response)
+    # causing ENOEXEC at runtime when x86_64 tries to execute ARM64 wine binaries.
+    PROTON_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[] | select(.name | test("^GE-Proton[0-9]+-[0-9]+\\.tar\\.gz$")) | .browser_download_url' 2>/dev/null | head -n1) || { echo "Failed to parse Proton-GE release JSON" >&2; exit 1; }; \
+    [ -n "$PROTON_URL" ] || { echo "No Proton-GE x86_64 .tar.gz found in latest release" >&2; exit 1; }; \
     curl -sSL "$PROTON_URL" -o proton-ge.tar.gz || { echo "Failed to download Proton-GE from $PROTON_URL" >&2; exit 1; }; \
     mkdir -p /opt/ProtonGE /usr/local/bin && tar -xzf proton-ge.tar.gz -C /opt/ProtonGE --strip-components=1; \
     rm -rf proton-ge.tar.gz /tmp/*; \
@@ -117,29 +90,33 @@ RUN set -eux; cd /tmp; \
     ln -sf /opt/ProtonGE/proton /usr/local/bin/proton; \
     ln -sf /home/container/.proton-dist.lock /opt/ProtonGE/dist.lock
 
-# GE-Proton11 uses a unified 64-bit wine binary (no wine64 — it's obsolete).
-# Python 3.13's posix_spawn does NOT fall back to /bin/sh for scripts without
-# a shebang — it returns ENOEXEC immediately. Fix: if files/bin/wine is a
-# shell script lacking a shebang, prepend #!/bin/sh. The script already knows
-# the correct internal wine binary paths; we only need to make it executable
-# by posix_spawn without guessing GE-Proton release-specific binary paths.
+# Python 3.13 posix_spawn ENOEXEC fix for files/bin/wine.
+# posix_spawn does NOT fall back to /bin/sh for scripts without a shebang —
+# it returns ENOEXEC immediately (unlike the old fork+exec path in Python ≤3.12).
+# Use `file -b` for reliable ELF detection instead of od|grep, and log every
+# branch so the build output shows exactly what was (or wasn't) patched.
 RUN set -eu; \
     WINE_BIN=/opt/ProtonGE/files/bin/wine; \
-    if [ -f "$WINE_BIN" ] && \
-       ! od -A n -t x1 -N 4 "$WINE_BIN" | grep -q '7f 45 4c 46' && \
-       [ "$(head -c2 "$WINE_BIN")" != '#!' ]; then \
-        echo "Prepending #!/bin/sh shebang to $WINE_BIN (Python 3.13 ENOEXEC fix)"; \
-        { printf '#!/bin/sh\n'; cat "$WINE_BIN"; } > "${WINE_BIN}.new" && \
-        mv "${WINE_BIN}.new" "$WINE_BIN" && \
-        chmod +x "$WINE_BIN"; \
+    if [ ! -f "$WINE_BIN" ]; then \
+        echo "WARN: $WINE_BIN not found — ProtonGE layout may have changed" >&2; \
+        ls -la /opt/ProtonGE/files/bin/ >&2 || true; \
+    elif file -b "$WINE_BIN" | grep -q '^ELF'; then \
+        echo "files/bin/wine is an ELF binary — posix_spawn exec OK, no patch needed"; \
+    elif [ "$(head -c2 "$WINE_BIN")" = '#!' ]; then \
+        echo "files/bin/wine already has shebang: $(head -n1 "$WINE_BIN") — no patch needed"; \
+    else \
+        echo "files/bin/wine is a script without shebang — prepending #!/bin/sh (Python 3.13 ENOEXEC fix)"; \
+        { printf '#!/bin/sh\n'; cat "$WINE_BIN"; } > "${WINE_BIN}.new" \
+            && mv "${WINE_BIN}.new" "$WINE_BIN" \
+            && chmod +x "$WINE_BIN"; \
+        echo "Patched. First line is now: $(head -n1 "$WINE_BIN")"; \
     fi
 
 # GE-Proton11 no longer bundles a pre-built default_pfx in the release tarball.
 # On first run proton calls wine wineboot and writes to files/share/default_pfx/ —
 # but that path is inside the read-only image layer in Pelican/Pterodactyl.
 # Redirect to /home/container/.proton-default-pfx (writable persistent volume).
-RUN if [ ! -d /opt/ProtonGE/files/share/default_pfx ] && \
-       [ ! -L /opt/ProtonGE/files/share/default_pfx ]; then \
+RUN if [ ! -d /opt/ProtonGE/files/share/default_pfx ] && [ ! -L /opt/ProtonGE/files/share/default_pfx ]; then \
         mkdir -p /opt/ProtonGE/files/share && \
         ln -sf /home/container/.proton-default-pfx \
             /opt/ProtonGE/files/share/default_pfx; \
@@ -154,20 +131,15 @@ RUN wget -q -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winet
         https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks.bash-completion
 
 # -----------------------------
-# Pipx PATH setup (pipx installed via apt above)
+# RCON CLI installation (latest release)
 # -----------------------------
-RUN python3 -m pipx ensurepath || true
-
-# -----------------------------
-# RCON CLI installation (latest, dynamisch)
-# -----------------------------
-RUN cd /tmp \
-    && RCON_URL=$(curl -s https://api.github.com/repos/gorcon/rcon-cli/releases/latest \
-        | grep browser_download_url | cut -d\" -f4 | grep 'amd64_linux\.tar\.gz') \
-    && curl -sLOJ "$RCON_URL" \
-    && tar xvf rcon-*-amd64_linux.tar.gz \
-    && mv rcon-*/rcon /usr/local/bin/ \
-    && rm -rf /tmp/*
+RUN set -eux; cd /tmp; \
+    RCON_LATEST=$(curl -sSf https://api.github.com/repos/gorcon/rcon-cli/releases/latest 2>&1 | jq -r '.assets[] | select(.name | contains("amd64_linux")) | .browser_download_url' | head -n1) || true; \
+    if [ -n "$RCON_LATEST" ]; then \
+        curl -sSL "$RCON_LATEST" -o rcon.tar.gz && tar -xzf rcon.tar.gz && \
+        mv rcon-*-amd64_linux/rcon /usr/local/bin/ 2>/dev/null && chmod +x /usr/local/bin/rcon || true; \
+    fi; \
+    rm -rf /tmp/*
 
 # -----------------------------
 # Default stop signal and entrypoint

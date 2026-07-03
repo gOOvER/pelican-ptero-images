@@ -395,16 +395,6 @@ fi
 sleep 2
 
 # ----------------------------
-# Fix relative asset paths when working dir is /home/container/bin
-# ----------------------------
-# Prevent missing gui/locale.kvp if the game expects bin/gui, bin/packs, etc.
-for d in gui packs data; do
-    if [[ -d "/home/container/$d" && ! -e "/home/container/bin/$d" ]]; then
-        ln -s "../$d" "/home/container/bin/$d" 2>/dev/null || true
-    fi
-done
-
-# ----------------------------
 # Switch to the container's working directory
 # ----------------------------
 cd /home/container || { msg RED "Cannot cd to /home/container"; exit 1; }

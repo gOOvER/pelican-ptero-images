@@ -19,39 +19,25 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN dpkg --add-architecture i386 && \
     apt-get update && apt-get -y upgrade && \
     apt-get install -y --no-install-recommends \
-    nala \
-    alsa-tools \
     ca-certificates \
     cabextract \
     curl \
     dbus \
-    ffmpeg \
     file \
-    git \
-    iproute2 \
     jq \
     locales \
     numactl \
-    mesa-utils \
-    net-tools \
-    netcat-openbsd \
     openssl \
-    pulseaudio \
     python3-full \
-    python3-venv \
-    steam-devices \
     tar \
     tini \
     wget \
     winbind \
     xvfb \
     lib32gcc-s1 \
-    libao-common \
     libasound2 \
     libfreetype6 \
     libfreetype6:i386 \
-    libsdl1.2debian \
-    libsdl1.2debian:i386 \
     libsdl2-2.0-0 \
     libsdl2-2.0-0:i386 \
     libssl3 \
@@ -63,15 +49,6 @@ RUN dpkg --add-architecture i386 && \
     libnss3 \
     libpulse-dev \
     libpulse0 \
-    gstreamer1.0-plugins-base \
-    gstreamer1.0-plugins-good \
-    gstreamer1.0-plugins-bad \
-    gstreamer1.0-plugins-ugly \
-    gstreamer1.0-libav \
-    gstreamer1.0-x \
-    gstreamer1.0-alsa \
-    gstreamer1.0-gl \
-    gstreamer1.0-pulseaudio \
     mesa-vulkan-drivers \
     mesa-vulkan-drivers:i386 && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
@@ -83,11 +60,14 @@ RUN set -eux; cd /tmp; \
     curl_args=(-sSf); \
     [ -n "${GITHUB_TOKEN:-}" ] && curl_args+=(-H "Authorization: Bearer ${GITHUB_TOKEN}"); \
     PROTON_JSON=$(curl "${curl_args[@]}" https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest 2>&1) || { echo "Failed to fetch Proton-GE releases" >&2; exit 1; }; \
-    # Extract .tar.gz URL using jq (installed in layer 1)
-    PROTON_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[].browser_download_url' 2>/dev/null | grep '\.tar\.gz$' | head -n1) || { echo "Failed to parse Proton-GE release JSON" >&2; exit 1; }; \
-    [ -n "$PROTON_URL" ] || { echo "No Proton-GE .tar.gz found in latest release" >&2; exit 1; }; \
-    # Extract checksum URL
-    PROTON_CHECKSUM_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[].browser_download_url' 2>/dev/null | grep '\.sha512sum$' | head -n1) || true; \
+    # Extract x86_64 .tar.gz URL - match only bare "GE-ProtonXX-Y.tar.gz" (no arch suffix)
+    # GE-Proton11-1 introduced separate aarch64 builds; without this filter
+    # head -n1 would grab the aarch64 tarball first (it appears earlier in the API response)
+    # causing ENOEXEC at runtime when x86_64 tries to execute ARM64 wine binaries.
+    PROTON_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[] | select(.name | test("^GE-Proton[0-9]+-[0-9]+\\.tar\\.gz$")) | .browser_download_url' 2>/dev/null | head -n1) || { echo "Failed to parse Proton-GE release JSON" >&2; exit 1; }; \
+    [ -n "$PROTON_URL" ] || { echo "No Proton-GE x86_64 .tar.gz found in latest release" >&2; exit 1; }; \
+    # Extract matching checksum URL (same name pattern without arch suffix)
+    PROTON_CHECKSUM_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[] | select(.name | test("^GE-Proton[0-9]+-[0-9]+\\.sha512sum$")) | .browser_download_url' 2>/dev/null | head -n1) || true; \
     # Download Proton-GE tarball
     curl -sSL "$PROTON_URL" -o proton-ge.tar.gz || { echo "Failed to download Proton-GE from $PROTON_URL" >&2; exit 1; }; \
     [ -s proton-ge.tar.gz ] || { echo "Downloaded Proton-GE archive is empty" >&2; exit 1; }; \
