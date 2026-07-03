@@ -117,6 +117,23 @@ RUN set -eux; cd /tmp; \
     ln -sf /opt/ProtonGE/proton /usr/local/bin/proton; \
     ln -sf /home/container/.proton-dist.lock /opt/ProtonGE/dist.lock
 
+# GE-Proton11 ships files/bin/wine as the 32-bit wine preloader binary, which fails with
+# ENOEXEC on kernels/containers without IA-32 execution support. Replace with wine64
+# (the 64-bit wine binary — functionally identical in WOW64 mode on x86_64 hosts).
+RUN [ -f /opt/ProtonGE/files/bin/wine64 ] && \
+    ln -sf wine64 /opt/ProtonGE/files/bin/wine || true
+
+# GE-Proton11 no longer bundles a pre-built default_pfx in the release tarball.
+# On first run proton calls wine wineboot and writes to files/share/default_pfx/ —
+# but that path is inside the read-only image layer in Pelican/Pterodactyl.
+# Redirect to /home/container/.proton-default-pfx (writable persistent volume).
+RUN if [ ! -d /opt/ProtonGE/files/share/default_pfx ] && \
+       [ ! -L /opt/ProtonGE/files/share/default_pfx ]; then \
+        mkdir -p /opt/ProtonGE/files/share && \
+        ln -sf /home/container/.proton-default-pfx \
+            /opt/ProtonGE/files/share/default_pfx; \
+    fi
+
 # -----------------------------
 # Winetricks installation (global)
 # -----------------------------
