@@ -191,15 +191,20 @@ RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 RUN ln -sf /home/container/.proton-dist.lock /opt/ProtonGE/dist.lock
 
 # GE-Proton11 uses a unified 64-bit wine binary (no wine64 — it's obsolete).
-# The wine architecture is now defined via the prefix; default is x64.
-# files/bin/wine may be a shell script without a shebang, which causes Python
-# 3.12+ posix_spawn to return ENOEXEC (older Python fell back to /bin/sh).
-# Replace with an explicit wrapper that has a shebang and calls the preloader.
-RUN if [ -f /opt/ProtonGE/files/lib/wine/x86_64-unix/wine-preloader ] && \
-       [ -f /opt/ProtonGE/files/lib/wine/x86_64-unix/wine ]; then \
-        printf '#!/bin/sh\nBD="$(dirname "$(readlink -f "$0")")"\nexec "${BD}/../lib/wine/x86_64-unix/wine-preloader" "${BD}/../lib/wine/x86_64-unix/wine" "$@"\n' \
-            > /opt/ProtonGE/files/bin/wine && \
-        chmod +x /opt/ProtonGE/files/bin/wine; \
+# Python 3.13's posix_spawn does NOT fall back to /bin/sh for scripts without
+# a shebang — it returns ENOEXEC immediately. Fix: if files/bin/wine is a
+# shell script lacking a shebang, prepend #!/bin/sh. The script already knows
+# the correct internal wine binary paths; we only need to make it executable
+# by posix_spawn without guessing GE-Proton release-specific binary paths.
+RUN set -eu; \
+    WINE_BIN=/opt/ProtonGE/files/bin/wine; \
+    if [ -f "$WINE_BIN" ] && \
+       ! od -A n -t x1 -N 4 "$WINE_BIN" | grep -q '7f 45 4c 46' && \
+       [ "$(head -c2 "$WINE_BIN")" != '#!' ]; then \
+        echo "Prepending #!/bin/sh shebang to $WINE_BIN (Python 3.13 ENOEXEC fix)"; \
+        { printf '#!/bin/sh\n'; cat "$WINE_BIN"; } > "${WINE_BIN}.new" && \
+        mv "${WINE_BIN}.new" "$WINE_BIN" && \
+        chmod +x "$WINE_BIN"; \
     fi
 
 # GE-Proton11 no longer bundles a pre-built default_pfx in the release tarball.
