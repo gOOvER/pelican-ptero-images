@@ -297,6 +297,12 @@ export AUDIODEV="${AUDIODEV:-null}"
 # Set DXVK_LOG_LEVEL=info to restore full DXVK output for debugging.
 export DXVK_LOG_LEVEL="${DXVK_LOG_LEVEL:-error}"
 
+# Suppress VKD3D-Proton log noise on headless servers.
+# Common false-positive: "Adapter with luid X not found" when a previously used
+# GPU's LUID is stored in the Wine prefix but doesn't match lavapipe's adapter.
+# Set VKD3D_DEBUG=err or VKD3D_DEBUG=warn to restore error/warning output.
+export VKD3D_DEBUG="${VKD3D_DEBUG:-none}"
+
 # Suppress OpenVR/OpenXR init attempts - not needed for dedicated servers.
 export PROTON_ENABLE_NVAPI="${PROTON_ENABLE_NVAPI:-0}"
 export DXVK_ENABLE_NVAPI="${DXVK_ENABLE_NVAPI:-0}"

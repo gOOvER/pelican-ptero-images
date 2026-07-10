@@ -181,6 +181,8 @@ export DISPLAY="${DISPLAY:-:0}"
 export DISPLAY_WIDTH="${DISPLAY_WIDTH:-1024}"
 export DISPLAY_HEIGHT="${DISPLAY_HEIGHT:-768}"
 export DISPLAY_DEPTH="${DISPLAY_DEPTH:-24}"
+# Default WINETRICKS_RUN to empty string to avoid unbound variable errors with set -u
+WINETRICKS_RUN="${WINETRICKS_RUN:-}"
 
 # Rotate any existing large logs at startup to avoid immediate disk blowup
 rotate_log "$WINEPREFIX/dotnet_direct_install.log" 5242880 3 || true
