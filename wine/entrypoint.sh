@@ -274,7 +274,7 @@ else
         fi
 
         msg YELLOW "Splitting PEM bundle into individual cert files (robust split)..."
-        awk 'BEGIN{n=0} /-----BEGIN CERTIFICATE-----/{n++; fname=sprintf("cert%04d.pem",n)} {print > fname}' cacert.pem 2>>"$CERT_LOG" || true
+        awk 'BEGIN{n=0} /-----BEGIN CERTIFICATE-----/{n++; fname=sprintf("cert%04d.pem",n)} fname{print > fname}' cacert.pem 2>>"$CERT_LOG" || true
         find . -maxdepth 1 -type f -name 'cert*.pem' -size 0 -delete
         progress 1 2 "Converting and importing certificates..."
         msg YELLOW "Converting valid PEM files to DER (.cer) and importing into Wine's root store..."
