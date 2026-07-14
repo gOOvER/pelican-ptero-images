@@ -42,7 +42,7 @@ RUN         curl -sL https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
 
 # updating npm
 RUN         npm install npm@next-10 -g
-RUN         npm install typescript ts-node @types/node --location=global
+RUN         npm install typescript ts-node tsx @types/node --location=global
 
 # install pnpm
 RUN         npm install -g corepack
