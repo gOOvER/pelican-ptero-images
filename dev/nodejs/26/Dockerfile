@@ -36,7 +36,7 @@ RUN apt-get update && apt-get -y upgrade && \
     rm -rf /var/lib/apt/lists/*
 
 # Update npm, install TypeScript, ts-node, and enable Corepack (for pnpm and Yarn)
-RUN npm install -g npm@next-11 typescript ts-node tsx corepack && \
+RUN npm install -g npm@latest typescript tsx corepack && \
     corepack enable && \
     corepack prepare pnpm@latest --activate && \
     corepack prepare yarn@stable --activate
