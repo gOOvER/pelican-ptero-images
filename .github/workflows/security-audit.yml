@@ -39,7 +39,7 @@ jobs:
           exit-code: '0'
 
       - name: Upload Trivy Dockerfile results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v4.37.4
         if: always()
         with:
           sarif_file: 'trivy-dockerfile-results.sarif'
@@ -111,7 +111,7 @@ jobs:
 
       - name: Upload Trivy image results
         if: steps.build.outcome == 'success'
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v4.37.4
         with:
           sarif_file: 'trivy-image-results.sarif'
           category: 'container-${{ matrix.image-path }}'
