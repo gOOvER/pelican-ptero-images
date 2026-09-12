@@ -9,7 +9,7 @@ on:
     branches:
       - main
     paths:
-      - dev/rust/*
+      - dev/rust/**
 
 permissions:
   contents: read
@@ -53,5 +53,5 @@ jobs:
           network: host
           tags: |
             ghcr.io/goover/rust:${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=rust-${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=rust-${{ matrix.tag }}

@@ -155,8 +155,12 @@ export PROTON_LOG=1
 
 # Enable verbose Wine logging for crash diagnosis (can be overridden).
 # err-dxgi + -dxgi suppresses both err: and warn: EDID/display-metadata noise
-# on headless servers without a monitor. Set WINEDEBUG=+all to restore full output.
-export WINEDEBUG="${WINEDEBUG:-warn+all,err-dxgi,-dxgi}"
+# on headless servers without a monitor.
+# err-seh suppresses "EXCEPTION handling: System.ComponentModel.Win32Exception:
+# Invalid window handle" spam from .NET/Mono apps - these are caught exceptions
+# flowing through Wine's SEH mechanism and are not real errors in headless mode.
+# Set WINEDEBUG=+all to restore full output.
+export WINEDEBUG="${WINEDEBUG:-warn+all,err-dxgi,-dxgi,err-seh}"
 
 # Track crashes and errors
 export PROTON_CRASH_REPORT_DIR="$PROTON_LOG_DIR"

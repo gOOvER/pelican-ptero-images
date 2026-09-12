@@ -9,7 +9,7 @@ on:
     branches:
       - main
     paths:
-      - dev/nodejs/*
+      - dev/nodejs/**
 
 permissions:
   contents: read
@@ -61,5 +61,5 @@ jobs:
           network: host
           tags: |
             ghcr.io/goover/nodejs:${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=nodejs-${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=nodejs-${{ matrix.tag }}
