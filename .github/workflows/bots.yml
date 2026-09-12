@@ -32,6 +32,7 @@ jobs:
           - nodemongo7
           - nodemongo8
           - nodemongo83
+          - nodemongotest
           - parkertron
           - sogebot
 
