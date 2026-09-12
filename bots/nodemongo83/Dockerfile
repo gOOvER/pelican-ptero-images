@@ -11,7 +11,6 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     # Skip upgrade in container builds to save time
     apt-get install -y --no-install-recommends \
-        nala \
         ca-certificates \
         curl \
         dnsutils \
@@ -37,29 +36,20 @@ RUN apt-get update && \
         libsqlite3-dev \
     # temporäre Build-Tools für Node/Yarn
     && apt-get install -y --no-install-recommends \
-        nala \
         autoconf \
         automake \
         build-essential \
         g++ \
         libtool \
-        software-properties-common \
     && mkdir -p /etc/apt/keyrings \
     # Node.js 24.x installation
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
          | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" \
          > /etc/apt/sources.list.d/nodesource.list \
-    # Yarn installation
-    && curl -fsSL https://dl.yarnpkg.com/debian/pubkey.gpg \
-         | gpg --dearmor -o /etc/apt/keyrings/yarn.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/yarn.gpg] https://dl.yarnpkg.com/debian stable main" \
-         > /etc/apt/sources.list.d/yarn.list \
-    && apt-get update && apt-get install -y nodejs yarn \
-    nala \
+    && apt-get update && apt-get install -y nodejs \
     # NPM + Essential packages (minimal installation)
     && npm install -g npm@latest --no-audit --no-fund --silent \
-    && npm install -g corepack@latest --no-audit --no-fund --silent \
     && npm install -g json5 tsc typescript ts-node @types/node --no-audit --no-fund --silent \
     && corepack enable pnpm yarn \
     && corepack prepare pnpm@latest --activate \
@@ -68,6 +58,7 @@ RUN apt-get update && \
     && export BUN_INSTALL=/usr/local/bun \
     && curl -fsSL https://bun.sh/install | bash \
     && ln -sf /usr/local/bun/bin/bun /usr/local/bin/bun \
+    && ln -sf /usr/local/bun/bin/bunx /usr/local/bin/bunx \
     # Locale configuration
     && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen \
     # Keep build-essential/make in image — required for native npm modules (e.g. canvas, sodium)
@@ -78,6 +69,7 @@ ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8 \
     MONGO_PORT=27017 \
+    MONGO_BIND_IP=127.0.0.1 \
     MONGO_DB=botdb \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \

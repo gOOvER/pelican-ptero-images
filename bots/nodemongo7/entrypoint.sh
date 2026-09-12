@@ -90,7 +90,7 @@ msg RED "NodeJS & MongoDB Image by gOOvER - https://discord.goover.dev"
 msg RED "This Image is licencend under AGPLv3"
 line BLUE
 msg YELLOW "Running on: ${RED}$(. /etc/os-release ; echo $NAME $VERSION)"
-msg YELLOW "Current timezone: ${RED}$(cat /etc/timezone)"
+msg YELLOW "Current timezone: ${RED}$([ -f /etc/timezone ] && cat /etc/timezone || echo "${TZ:-UTC}")"
 line BLUE
 msg YELLOW "NodeJS Version: ${RED}$(node -v)"
 msg YELLOW "BUN Version: ${RED}$(bun --version)"
@@ -131,7 +131,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
         msg YELLOW "Checking MongoDB $MONGO_VERSION data compatibility (one-time check)..."
 
         # Quick test startup to verify data integrity
-        mongod --dbpath /home/container/mongodb/ --port $((MONGO_PORT + 1)) --logpath /tmp/mongo_test.log --fork 2>/dev/null || true
+        mongod --dbpath /home/container/mongodb/ --port $((MONGO_PORT + 1)) --bind_ip 127.0.0.1 --logpath /tmp/mongo_test.log --fork 2>/dev/null || true
         sleep 2
 
         # Check for major compatibility issues
@@ -184,7 +184,7 @@ line BLUE
 # MongoDB startup with WiredTiger optimizations
 mongod --dbpath /home/container/mongodb/ \
        --port $MONGO_PORT \
-       --bind_ip_all \
+       --bind_ip "${MONGO_BIND_IP:-127.0.0.1}" \
        --logpath /home/container/mongod.log \
        --logappend \
        --logRotate reopen \
@@ -192,8 +192,21 @@ mongod --dbpath /home/container/mongodb/ \
        --wiredTigerCacheSizeGB 0.5 > /dev/null 2>&1 &
 
 sleep 2
+WAIT_COUNT=0
+MAX_WAIT=30
 until nc -z -w5 127.0.0.1 $MONGO_PORT; do
-  echo 'Waiting for MongoDB connection...'
+  WAIT_COUNT=$((WAIT_COUNT + 1))
+  if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
+    line RED
+    msg RED "CRITICAL: MongoDB failed to start after $((MAX_WAIT * 3)) seconds!"
+    if [ -f /home/container/mongod.log ]; then
+      line RED
+      msg YELLOW "Last 25 lines of mongod.log:"
+      tail -n 25 /home/container/mongod.log
+    fi
+    exit 1
+  fi
+  echo "Waiting for MongoDB connection... ($WAIT_COUNT/$MAX_WAIT)"
   sleep 3
 done
 
@@ -240,7 +253,7 @@ MODIFIED_STARTUP=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 msg CYAN ":/home/container$ $MODIFIED_STARTUP"
 
 # exec bash -c für komplexe Shell-Kommandos
-exec bash -c "$MODIFIED_STARTUP"
+eval "$MODIFIED_STARTUP"
 
 # stop mongo with correct dbpath
 mongod --dbpath /home/container/mongodb/ --shutdown

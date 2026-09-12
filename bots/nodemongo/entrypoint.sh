@@ -45,7 +45,7 @@ line() {
 
 cleanup() {
     msg YELLOW "Cleaning up..."
-    # Simple cleanup - mongod --shutdown will handle MongoDB
+    mongod --shutdown --dbpath /home/container/mongodb/ 2>/dev/null || true
 }
 
 find_free_port() {
@@ -90,7 +90,7 @@ msg RED "NodeJS & MongoDB Image by gOOvER - https://discord.goover.dev"
 msg RED "This Image is licencend under AGPLv3"
 line BLUE
 msg YELLOW "Running on: ${RED}$(. /etc/os-release ; echo $NAME $VERSION)"
-msg YELLOW "Current timezone: ${RED}$(cat /etc/timezone)"
+msg YELLOW "Current timezone: ${RED}$([ -f /etc/timezone ] && cat /etc/timezone || echo "${TZ:-UTC}")"
 line BLUE
 msg YELLOW "NodeJS Version: ${RED}$(node -v)"
 msg YELLOW "BUN Version: ${RED}$(bun --version)"
@@ -135,7 +135,7 @@ if [ -f "/home/container/mongodb/_mdb_catalog.wt" ] || [ -f "/home/container/mon
         msg YELLOW "Testing MongoDB $MONGO_VERSION compatibility..."
 
         # Start mongod briefly to check for errors
-        mongod --dbpath /home/container/mongodb/ --port $((MONGO_PORT + 1)) --logpath /tmp/mongo_test.log --fork 2>/dev/null || true
+        mongod --dbpath /home/container/mongodb/ --port $((MONGO_PORT + 1)) --bind_ip 127.0.0.1 --logpath /tmp/mongo_test.log --fork 2>/dev/null || true
         sleep 2
 
         # Check if the test log contains version compatibility errors
@@ -198,7 +198,7 @@ line BLUE
 # MongoDB startup with latest features and optimizations
 mongod --dbpath /home/container/mongodb/ \
        --port $MONGO_PORT \
-       --bind_ip_all \
+       --bind_ip "${MONGO_BIND_IP:-127.0.0.1}" \
        --logpath /home/container/mongod.log \
        --logappend \
        --storageEngine wiredTiger \
@@ -207,8 +207,21 @@ mongod --dbpath /home/container/mongodb/ \
        --setParameter flowControlTargetLagSeconds=10 > /dev/null 2>&1 &
 
 sleep 2
+WAIT_COUNT=0
+MAX_WAIT=30
 until nc -z -w5 127.0.0.1 $MONGO_PORT; do
-  echo 'Waiting for MongoDB connection...'
+  WAIT_COUNT=$((WAIT_COUNT + 1))
+  if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
+    line RED
+    msg RED "CRITICAL: MongoDB failed to start after $((MAX_WAIT * 3)) seconds!"
+    if [ -f /home/container/mongod.log ]; then
+      line RED
+      msg YELLOW "Last 25 lines of mongod.log:"
+      tail -n 25 /home/container/mongod.log
+    fi
+    exit 1
+  fi
+  echo "Waiting for MongoDB connection... ($WAIT_COUNT/$MAX_WAIT)"
   sleep 3
 done
 
@@ -219,7 +232,7 @@ msg GREEN "✓ MongoDB is ready"
 # Set Feature Compatibility Version dynamically
 # ----------------------------
 line CYAN
-# TARGET_FCV comes from the MONGO_VERSION detected at startup
+# TARGET_FCV comes from the MONGO_VERSION detected at startup (e.g. 8.3)
 TARGET_FCV="$MONGO_VERSION"
 
 msg YELLOW "Checking MongoDB Feature Compatibility Version (MongoDB $MONGO_VERSION)..."
