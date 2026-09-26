@@ -27,8 +27,6 @@ jobs:
       fail-fast: false
       matrix:
         tag:
-          - '1.12'
-          - '1.13'
           - '1.14'
           - '1.15'
           - '1.16'
@@ -60,5 +58,5 @@ jobs:
           network: host
           tags: |
             ghcr.io/goover/elixir:${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=elixir-${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=elixir-${{ matrix.tag }}

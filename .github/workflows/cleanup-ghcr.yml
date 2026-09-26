@@ -1,0 +1,24 @@
+name: Cleanup Untagged GHCR Images
+
+on:
+  schedule:
+    # Run every Sunday at 03:00 UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    name: Prune Untagged Packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prune untagged package versions
+        uses: actions/delete-package-versions@v5
+        with:
+          owner: ${{ github.repository_owner }}
+          package-type: 'container'
+          package-name: 'java,debian,ubuntu,alpine,dotnet,nodejs,elixir,postgres,redis,mariadb,mongodb,keydb,python,rust,bun,dart,erlang,go,mono,wine,games'
+          delete-only-untagged-versions: 'true'
+          min-versions-to-keep: 0
