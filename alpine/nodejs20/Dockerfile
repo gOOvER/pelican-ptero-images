@@ -1,4 +1,4 @@
-FROM        --platform=$TARGETOS/$TARGETARCH node:20-alpine
+FROM        node:20-alpine
 
 LABEL       org.opencontainers.image.authors="info@goover.de"
 LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"
@@ -30,7 +30,7 @@ RUN         apk add --no-cache \
                 zip \
                 libc6-compat
 
-RUN         npm install -g typescript ts-node
+RUN         npm install -g typescript@latest ts-node@latest
 
 ## Setup user and working directory
 RUN         adduser -D -h /home/container container -s /bin/bash container

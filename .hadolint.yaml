@@ -1,0 +1,20 @@
+failure-threshold: error
+ignored:
+  - DL3008 # Pin versions in apt-get install (game/hosting images install latest security updates)
+  - DL3007 # Using latest tag
+  - DL3013 # Pin versions in pip
+  - DL3016 # Pin versions in npm
+  - DL3018 # Pin versions in apk add
+  - DL3020 # Use COPY instead of ADD
+  - DL3027 # Do not use apt as it is meant to be an end-user tool
+  - DL3029 # Do not use --platform flag with FROM
+  - DL3003 # Use WORKDIR to switch to a directory
+  - DL4001 # Either use Wget or Curl but not both
+  - DL4006 # Set SHELL pipefail
+  - DL3042 # Avoid use of cache directory with pip
+  - DL3041 # Specify version with dnf install
+  - DL3064 # Potentially sensitive data in ARG/ENV
+  - DL3065 # Use apt-cache
+  - DL3002 # Last USER should not be root
+  - SC2174 # When used with -p, -m only applies to the deepest directory
+  - SC3054 # In POSIX sh, array references are undefined

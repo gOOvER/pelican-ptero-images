@@ -1,4 +1,4 @@
-FROM        --platform=$TARGETOS/$TARGETARCH node:22-alpine
+FROM        node:22-alpine
 
 LABEL       org.opencontainers.image.authors="Torsten Widmann - gOOvER - info@goover.de"
 LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"

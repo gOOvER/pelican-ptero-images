@@ -1,4 +1,4 @@
-FROM        --platform=$TARGETOS/$TARGETARCH alpine:latest
+FROM        alpine:latest
 
 LABEL       org.opencontainers.image.authors="info@goover.de"
 LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"
