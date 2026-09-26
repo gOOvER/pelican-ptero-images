@@ -1,5 +1,5 @@
 ARG         POSTGRES_VERSION=16
-ARG         POSTGRES_BASE=postgres:${POSTGRES_VERSION}-bookworm
+ARG         POSTGRES_BASE=postgres:${POSTGRES_VERSION}-trixie
 FROM        --platform=$TARGETOS/$TARGETARCH ${POSTGRES_BASE}
 
 LABEL       org.opencontainers.image.authors="info@goover.de"

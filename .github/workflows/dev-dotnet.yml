@@ -68,7 +68,7 @@ jobs:
           file: ./dev/dotnet/Dockerfile
           build-args: |
             DOTNET_CHANNEL=${{ format('{0}.0', matrix.tag) }}
-            BASE_IMAGE=debian:bookworm-slim
+            BASE_IMAGE=debian:trixie-slim
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=debian:bookworm-slim
+ARG BASE_IMAGE=debian:trixie-slim
 FROM        --platform=$TARGETOS/$TARGETARCH ${BASE_IMAGE}
 
 LABEL       org.opencontainers.image.authors="info@goover.de"
