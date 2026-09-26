@@ -41,10 +41,8 @@ jobs:
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
         exclude:
-          # shipilev/openjdk has no ARM64 images for JDK 8 and 11
+          # shipilev/openjdk has no ARM64 images for JDK 8
           - tag: 8
-            platform: linux/arm64
-          - tag: 11
             platform: linux/arm64
     steps:
       - uses: actions/checkout@v7
@@ -67,7 +65,7 @@ jobs:
           context: ./java/shenandoah
           file: ./java/shenandoah/Dockerfile
           build-args: |
-            JAVA_BASE=${{ (matrix.tag == 8 || matrix.tag == 11) && format('shipilev/openjdk:{0}', matrix.tag) || format('eclipse-temurin:{0}-jdk-noble', matrix.tag) }}
+            JAVA_BASE=${{ matrix.tag == 8 && 'shipilev/openjdk:8' || format('eclipse-temurin:{0}-jdk-noble', matrix.tag) }}
           platforms: ${{ matrix.platform }}
           push: true
           network: host
@@ -97,16 +95,16 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create multi-arch manifest (17/21/25)
-        if: ${{ matrix.tag != 8 && matrix.tag != 11 }}
+      - name: Create multi-arch manifest (11/17/21/25)
+        if: ${{ matrix.tag != 8 }}
         run: |
           docker buildx imagetools create \
             --tag ghcr.io/goover/java:shenandoah_${{ matrix.tag }} \
             ghcr.io/goover/java:shenandoah_${{ matrix.tag }}-linux-amd64 \
             ghcr.io/goover/java:shenandoah_${{ matrix.tag }}-linux-arm64
 
-      - name: Create amd64-only manifest (8/11)
-        if: ${{ matrix.tag == 8 || matrix.tag == 11 }}
+      - name: Create amd64-only manifest (8)
+        if: ${{ matrix.tag == 8 }}
         run: |
           docker buildx imagetools create \
             --tag ghcr.io/goover/java:shenandoah_${{ matrix.tag }} \
