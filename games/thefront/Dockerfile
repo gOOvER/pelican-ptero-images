@@ -90,7 +90,7 @@ RUN         cd /tmp/ \
 RUN         touch /tmp/passwd /tmp/group \
             && chgrp 0 /tmp/passwd /tmp/group \
             && chmod g+rw /tmp/passwd /tmp/group
-ADD         passwd.template /passwd.template
+COPY        passwd.template /passwd.template
 
 ## Setup user and working directory
 RUN         useradd -m -d /home/container -s /bin/bash container

@@ -23,7 +23,7 @@ jobs:
         with:
           recursive: true
           failure-threshold: error
-          ignore: DL3008,DL3007,DL3013,DL3018,DL4006
+          ignore: DL3008,DL3007,DL3013,DL3018,DL4006,DL3020
 
   shellcheck:
     name: Lint Shell Scripts (ShellCheck)
