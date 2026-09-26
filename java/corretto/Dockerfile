@@ -5,7 +5,8 @@ LABEL       org.opencontainers.image.authors="info@goover.de"
 LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"
 LABEL       org.opencontainers.image.licenses=AGPL-3.0-or-later
 LABEL       org.opencontainers.image.description="Docker image for Pelican Hosting Panel and Pterodactyl"
-ARG         DEBIAN_FRONTEND=noninteractive
+ARG         JAVA_VERSION=17
+ENV         DEBIAN_FRONTEND=noninteractive
 
 RUN 		apt-get update \
 			&& apt-get upgrade -y \
@@ -31,10 +32,12 @@ RUN 		apt-get update \
 			&& apt-get clean \
 			&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-RUN         wget -O- -q https://apt.corretto.aws/corretto.key | apt-key add - \
-			&& add-apt-repository 'deb https://apt.corretto.aws stable main' \
+RUN         CORRETTO_PKG=$([ "$JAVA_VERSION" = "8" ] && echo "java-1.8.0-amazon-corretto-jdk" || echo "java-${JAVA_VERSION}-amazon-corretto-jdk") \
+			&& mkdir -p /etc/apt/keyrings \
+			&& wget -O- -q https://apt.corretto.aws/corretto.key | gpg --dearmor -o /etc/apt/keyrings/corretto.gpg \
+			&& echo "deb [signed-by=/etc/apt/keyrings/corretto.gpg] https://apt.corretto.aws stable main" > /etc/apt/sources.list.d/corretto.list \
 			&& apt-get update \
-			&& apt-get install -y --no-install-recommends java-${JAVA_VERSION}-amazon-corretto-jdk \
+			&& apt-get install -y --no-install-recommends "$CORRETTO_PKG" \
 			&& apt-get clean \
 			&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
