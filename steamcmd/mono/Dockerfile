@@ -7,11 +7,10 @@ LABEL       org.opencontainers.image.description="Docker image for Pelican Hosti
 
 # Update the repository and install needed packages
 ARG         DEBIAN_FRONTEND=noninteractive
-RUN         bash -lc 'set -euo pipefail; \
-    dpkg --add-architecture i386; \
-    apt-get update; \
-    apt-get -y upgrade; \
-    apt-get install -y --no-install-recommends' \
+RUN         dpkg --add-architecture i386 \
+        && apt-get update \
+        && apt-get -y upgrade \
+        && apt-get install -y --no-install-recommends \
             nala \
             ca-certificates \
             curl \
