@@ -10,7 +10,8 @@ RUN         apk update
 RUN         apk upgrade
 RUN         apk add --no-cache tzdata xvfb wget curl git
 RUN         apk add wine --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/edge/community --allow-untrusted
-RUN         apk add winetricks --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing/ --allow-untrusted
+RUN         apk add winetricks --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/edge/community --allow-untrusted || \
+            (wget -q -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks && chmod +x /usr/local/bin/winetricks)
 
 # ENV
 ENV         HOME=/home/container
