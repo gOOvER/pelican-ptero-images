@@ -63,7 +63,7 @@ export INTERNAL_IP
 # ----------------------------
 clear
 line BLUE
-msg RED "Buzz Products Image by gOOvER - https://discord.goover.dev"
+msg RED "Buzz Products Image by gOOvER - https://dsc.gg/goover"
 msg RED "This Image is licensed under AGPLv3"
 line BLUE
 msg YELLOW "Running on: ${RED}$(. /etc/os-release ; echo $NAME $VERSION)"

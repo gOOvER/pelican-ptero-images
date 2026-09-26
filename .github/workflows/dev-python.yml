@@ -54,7 +54,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./dev/python
-          file: ./dev/python/${{ matrix.tag }}/Dockerfile
+          file: ./dev/python/Dockerfile
+          build-args: |
+            PYTHON_VERSION=${{ matrix.tag }}
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

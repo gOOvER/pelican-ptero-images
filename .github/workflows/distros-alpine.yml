@@ -47,8 +47,11 @@ jobs:
 
       - uses: docker/build-push-action@v7
         with:
-          context: ./distros/alpine/${{ matrix.oses }}
-          file: ./distros/alpine/${{ matrix.oses }}/Dockerfile
+          context: ./distros/alpine
+          file: ./distros/alpine/Dockerfile
+          build-args: |
+            ALPINE_TAG=${{ matrix.oses }}
+            ALPINE_BRANCH=${{ matrix.oses == 'edge' && 'edge' || 'latest-stable' }}
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

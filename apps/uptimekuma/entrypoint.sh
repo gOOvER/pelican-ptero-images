@@ -23,7 +23,7 @@ export INTERNAL_IP
 
 # system informations
 printf "%b\n" "${BLUE}---------------------------------------------------------------------${NC}"
-printf "%b\n" "${RED}Uptime Kuma Image by gOOvER - https://discord.goover.dev${NC}"
+printf "%b\n" "${RED}Uptime Kuma Image by gOOvER - https://dsc.gg/goover${NC}"
 printf "%b\n" "${BLUE}---------------------------------------------------------------------${NC}"
 printf "%b\n" "${YELLOW}Running on Alpine: ${RED} $(cat /etc/alpine-release)${NC}"
 printf "%b\n" "${YELLOW}Current timezone: ${RED} ${TZ} ${NC}"

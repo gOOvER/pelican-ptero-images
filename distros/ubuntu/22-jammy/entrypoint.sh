@@ -23,7 +23,7 @@ export INTERNAL_IP
 
 # system informations
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
-echo -e "${RED}Ubuntu Image by gOOvER - https://discord.goover.dev${NC}"
+echo -e "${RED}Ubuntu Image by gOOvER - https://dsc.gg/goover${NC}"
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
 echo -e "${YELLOW}Running on Ubuntu ${RED} $(cat /etc/debian_version)${NC}"
 echo -e "${YELLOW}Current timezone: ${RED} $(cat /etc/timezone)${NC}"

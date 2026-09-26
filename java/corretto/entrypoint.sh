@@ -25,7 +25,7 @@ export INTERNAL_IP
 
 # system informations
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
-echo -e "${RED}Java Corretto Image by gOOvER - https://discord.goover.dev${NC}"
+echo -e "${RED}Java Corretto Image by gOOvER - https://dsc.gg/goover${NC}"
 echo -e "${RED}THIS IMAGE IS LICENSED UNDER AGPLv3${NC}"
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
 echo -e "${YELLOW}Linux Distribution: ${RED} $(. /etc/os-release ; echo $PRETTY_NAME)${NC}"

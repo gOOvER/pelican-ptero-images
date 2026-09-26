@@ -59,7 +59,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./java/dragonwell
-          file: ./java/dragonwell/${{ matrix.tag }}/Dockerfile
+          file: ./java/dragonwell/Dockerfile
+          build-args: |
+            JAVA_VERSION=${{ matrix.tag }}
           platforms: ${{ matrix.platform }}
           push: true
           network: host

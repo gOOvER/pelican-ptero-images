@@ -84,7 +84,7 @@ JAVA_VER=$(java -version 2>&1 | head -n 1 || echo "Java not found")
 # ----------------------------
 clear
 line BLUE
-msg RED "Java GraalVM Community Image by gOOvER - https://discord.goover.dev"
+msg RED "Java GraalVM Community Image by gOOvER - https://dsc.gg/goover"
 msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
 msg YELLOW "Linux Distribution: ${RED}$LINUX"

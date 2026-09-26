@@ -65,7 +65,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./java/shenandoah
-          file: ./java/shenandoah/${{ matrix.tag }}/Dockerfile
+          file: ./java/shenandoah/Dockerfile
+          build-args: |
+            JAVA_BASE=${{ (matrix.tag == 8 || matrix.tag == 11) && format('shipilev/openjdk:{0}', matrix.tag) || format('eclipse-temurin:{0}-jdk-noble', matrix.tag) }}
           platforms: ${{ matrix.platform }}
           push: true
           network: host

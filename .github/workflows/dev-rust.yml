@@ -47,7 +47,7 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./dev/rust
-          file: ./dev/rust/${{ matrix.tag }}/Dockerfile
+          file: ./dev/rust/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

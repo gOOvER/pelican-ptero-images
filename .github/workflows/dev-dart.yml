@@ -48,7 +48,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./dev/dart
-          file: ./dev/dart/${{ matrix.tag }}/Dockerfile
+          file: ./dev/dart/Dockerfile
+          build-args: |
+            DART_VERSION=${{ matrix.tag }}
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

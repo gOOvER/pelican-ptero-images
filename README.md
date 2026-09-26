@@ -5,7 +5,7 @@ Docker Images for the Hosting Panel Pelican, Jexactyl & Pterodactyl created by g
 A curated collection of core images that can be used with Pterodactyl's Egg system. Each image is rebuilt
 periodically to ensure dependencies are always up-to-date.
 
-[![Discord](https://img.shields.io/discord/1158000498952126464?label=Discord&logo=discord&logoColor=white)](https://discord.com/invite/RmqSeYBQ4y)
+[![Discord](https://img.shields.io/discord/1158000498952126464?label=Discord&logo=discord&logoColor=white)](https://dsc.gg/goover)
 [![License](https://img.shields.io/github/license/gOOvER/pelican-ptero-images)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/gOOvER/pelican-ptero-images?style=flat&logo=github)](https://github.com/gOOvER/pelican-ptero-images/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/gOOvER/pelican-ptero-images?style=flat&logo=github)](https://github.com/gOOvER/pelican-ptero-images/network/members)
@@ -49,6 +49,10 @@ periodically to ensure dependencies are always up-to-date.
 - [Bot Images](#bot-images)
 - [Application Images](#application-images)
 - [Distribution Images](#distribution-images)
+  - [Alpine](#alpine-distro)
+  - [Debian](#debian-distro)
+  - [Ubuntu](#ubuntu-distro)
+  - [Arch Linux](#archlinux-distro)
 - [Installer Images](#installer-images)
 - [Alpine Images](#alpine-images)
 - [Voice Images](#voice-images)
@@ -340,10 +344,12 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| mariadb:10.6 | `ghcr.io/goover/mariadb:10.6` | ✅ | ✅ |
-| mariadb:10.11 | `ghcr.io/goover/mariadb:10.11` | ✅ | ✅ |
-| mariadb:11.4 | `ghcr.io/goover/mariadb:11.4` | ✅ | ✅ |
-| mariadb:12.2 | `ghcr.io/goover/mariadb:12.2` | ✅ | ✅ |
+| mariadb:latest | `ghcr.io/goover/mariadb:latest` | ✅ | ✅ |
+| mariadb:lts | `ghcr.io/goover/mariadb:lts` | ✅ | ✅ |
+| mariadb:10 | `ghcr.io/goover/mariadb:10` | ✅ | ✅ |
+| mariadb:11 | `ghcr.io/goover/mariadb:11` | ✅ | ✅ |
+| mariadb:12 | `ghcr.io/goover/mariadb:12` | ✅ | ✅ |
+| mariadb:13 | `ghcr.io/goover/mariadb:13` | ✅ | ✅ |
 
 ---
 
@@ -523,37 +529,49 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | Status | Description |
 |-------|--------|-------------|
-| `goover/distros` | [![build alpine](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-alpine.yml/badge.svg)](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-alpine.yml) | Alpine Linux Base Images |
+| `goover/alpine` | [![build alpine](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-alpine.yml/badge.svg)](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-alpine.yml) | Alpine Linux Base Images |
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| distros:alpine_latest | `ghcr.io/goover/distros:alpine_latest` | ✅ | ✅ |
-| distros:alpine_edge | `ghcr.io/goover/distros:alpine_edge` | ✅ | ✅ |
+| alpine:latest | `ghcr.io/goover/alpine:latest` | ✅ | ✅ |
+| alpine:edge | `ghcr.io/goover/alpine:edge` | ✅ | ✅ |
 
 ## <a name="debian-distro"></a>➡️ Debian
 
 | Image | Status | Description |
 |-------|--------|-------------|
-| `goover/distros` | [![build debian](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-debian.yml/badge.svg)](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-debian.yml) | Debian Linux Base Images |
+| `goover/debian` | [![build debian](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-debian.yml/badge.svg)](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-debian.yml) | Debian Linux Base Images |
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| distros:debian_11 | `ghcr.io/goover/distros:debian_11` | ✅ | ✅ |
-| distros:debian_12 | `ghcr.io/goover/distros:debian_12` | ✅ | ✅ |
-| distros:debian_13 | `ghcr.io/goover/distros:debian_13` | ✅ | ✅ |
+| debian:11-bullseye | `ghcr.io/goover/debian:11-bullseye` | ✅ | ✅ |
+| debian:12-bookworm | `ghcr.io/goover/debian:12-bookworm` | ✅ | ✅ |
+| debian:13-trixie | `ghcr.io/goover/debian:13-trixie` | ✅ | ✅ |
 
 ## <a name="ubuntu-distro"></a>➡️ Ubuntu
 
 | Image | Status | Description |
 |-------|--------|-------------|
-| `goover/distros` | [![build ubuntu](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-ubuntu.yml/badge.svg)](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-ubuntu.yml) | Ubuntu Linux Base Images |
+| `goover/ubuntu` | [![build ubuntu](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-ubuntu.yml/badge.svg)](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-ubuntu.yml) | Ubuntu Linux Base Images |
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| distros:ubuntu_18 | `ghcr.io/goover/distros:ubuntu_18` | ✅ | ✅ |
-| distros:ubuntu_20 | `ghcr.io/goover/distros:ubuntu_20` | ✅ | ✅ |
-| distros:ubuntu_22 | `ghcr.io/goover/distros:ubuntu_22` | ✅ | ✅ |
-| distros:ubuntu_24 | `ghcr.io/goover/distros:ubuntu_24` | ✅ | ✅ |
+| ubuntu:18-bionic | `ghcr.io/goover/ubuntu:18-bionic` | ✅ | ✅ |
+| ubuntu:20-focal | `ghcr.io/goover/ubuntu:20-focal` | ✅ | ✅ |
+| ubuntu:22-jammy | `ghcr.io/goover/ubuntu:22-jammy` | ✅ | ✅ |
+| ubuntu:24-noble | `ghcr.io/goover/ubuntu:24-noble` | ✅ | ✅ |
+| ubuntu:26-resolute | `ghcr.io/goover/ubuntu:26-resolute` | ✅ | ✅ |
+
+## <a name="archlinux-distro"></a>➡️ Arch Linux
+
+| Image | Status | Description |
+|-------|--------|-------------|
+| `goover/archlinux` | [![build archlinux](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-archlinux.yml/badge.svg)](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/distros-archlinux.yml) | Arch Linux Base Images |
+
+| Image | URI | AMD64 | ARM64 |
+|-------|:---:|:-----:|:-----:|
+| archlinux:latest | `ghcr.io/goover/archlinux:latest` | ✅ | ❌ |
+| archlinux:base | `ghcr.io/goover/archlinux:base` | ✅ | ❌ |
 
 ---
 
@@ -570,6 +588,7 @@ periodically to ensure dependencies are always up-to-date.
 | installers:ubuntu | `ghcr.io/goover/installers:ubuntu` | ✅ | ✅ | Ubuntu Installer |
 | installers:nodejs | `ghcr.io/goover/installers:nodejs` | ✅ | ✅ | Node.js Installer |
 | installers:nodejs16 | `ghcr.io/goover/installers:nodejs16` | ✅ | ✅ | Node.js 16 Installer |
+| installers:nodejs22 | `ghcr.io/goover/installers:nodejs22` | ✅ | ✅ | Node.js 22 Installer |
 | installers:python | `ghcr.io/goover/installers:python` | ✅ | ✅ | Python Installer |
 | installers:python39 | `ghcr.io/goover/installers:python39` | ✅ | ✅ | Python 3.9 Installer |
 
@@ -620,5 +639,5 @@ This project is licensed under the AGPL-3.0-or-later License - see the [LICENSE]
 
 ## 💬 Support
 
-- Discord: [discord.com/invite/RmqSeYBQ4y](https://discord.com/invite/RmqSeYBQ4y)
+- Discord: [dsc.gg/goover](https://dsc.gg/goover)
 - Issues: [GitHub Issues](https://github.com/gOOvER/pelican-ptero-images/issues)

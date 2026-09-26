@@ -47,7 +47,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./database/keydb
-          file: ./database/keydb/${{ matrix.tag }}/Dockerfile
+          file: ./database/keydb/Dockerfile
+          build-args: |
+            KEYDB_VERSION=${{ matrix.tag }}
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

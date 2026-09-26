@@ -45,7 +45,7 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./dev/mono
-          file: ./dev/mono/${{ matrix.tag }}/Dockerfile
+          file: ./dev/mono/Dockerfile
           platforms: linux/amd64
           push: true
           network: host

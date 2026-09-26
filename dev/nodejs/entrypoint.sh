@@ -86,7 +86,7 @@ export INTERNAL_IP
 
 # system informations
 line BLUE
-msg RED "NodeJS Image by gOOvER - https://discord.goover.dev"
+msg RED "NodeJS Image by gOOvER - https://dsc.gg/goover"
 msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
 msg YELLOW "Linux Distribution: $(. /etc/os-release ; echo $PRETTY_NAME)"

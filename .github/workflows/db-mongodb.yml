@@ -30,6 +30,13 @@ jobs:
           - 5
           - 6
           - 7
+        include:
+          - tag: 5
+            base: mongo:5.0
+          - tag: 6
+            base: mongo:6.0
+          - tag: 7
+            base: mongo:7-jammy
 
     steps:
       - uses: actions/checkout@v7
@@ -49,7 +56,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./database/mongodb
-          file: ./database/mongodb/${{ matrix.tag }}/Dockerfile
+          file: ./database/mongodb/Dockerfile
+          build-args: |
+            MONGO_BASE=${{ matrix.base }}
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

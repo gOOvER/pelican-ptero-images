@@ -27,6 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         tag:
+          - 11
           - 12
           - 13
           - 14
@@ -34,6 +35,9 @@ jobs:
           - 16
           - 17
           - 18
+        include:
+          - tag: 18
+            base: postgres:18-trixie
 
     steps:
       - uses: actions/checkout@v7
@@ -53,7 +57,10 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./database/postgres
-          file: ./database/postgres/${{ matrix.tag }}/Dockerfile
+          file: ./database/postgres/Dockerfile
+          build-args: |
+            POSTGRES_VERSION=${{ matrix.tag }}
+            POSTGRES_BASE=${{ matrix.base || format('postgres:{0}-bookworm', matrix.tag) }}
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

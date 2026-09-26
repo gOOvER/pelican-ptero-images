@@ -62,7 +62,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./java/corretto
-          file: ./java/corretto/${{ matrix.tag }}/Dockerfile
+          file: ./java/corretto/Dockerfile
+          build-args: |
+            JAVA_VERSION=${{ matrix.tag }}
           platforms: ${{ matrix.platform }}
           push: true
           network: host

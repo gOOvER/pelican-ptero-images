@@ -122,7 +122,7 @@ clear
 # Prevent Wine/Proton output wrapping badly
 stty columns 250 || true
 line BLUE
-msg RED "SteamCMD Proton-GE Image by gOOvER - https://discord.goover.dev"
+msg RED "SteamCMD Proton-GE Image by gOOvER - https://dsc.gg/goover"
 msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
 msg YELLOW "System Information:"

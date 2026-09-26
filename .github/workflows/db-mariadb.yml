@@ -25,10 +25,12 @@ jobs:
       fail-fast: false
       matrix:
         tag:
-          - '10.6'
-          - '10.11'
-          - '11.4'
-          - '12.2'
+          - 'latest'
+          - 'lts'
+          - '10'
+          - '11'
+          - '12'
+          - '13'
 
     steps:
       - uses: actions/checkout@v7
@@ -49,7 +51,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./database/mariadb
-          file: ./database/mariadb/${{ matrix.tag }}/Dockerfile
+          file: ./database/mariadb/Dockerfile
+          build-args: |
+            MARIADB_VERSION=${{ matrix.tag }}
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

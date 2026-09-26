@@ -48,7 +48,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./dev/bun
-          file: ./dev/bun/${{ matrix.tag }}/Dockerfile
+          file: ./dev/bun/Dockerfile
+          build-args: |
+            BUN_VERSION=${{ matrix.tag }}
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

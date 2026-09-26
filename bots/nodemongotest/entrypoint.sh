@@ -86,7 +86,7 @@ export INTERNAL_IP
 # ----------------------------
 clear
 line BLUE
-msg RED "NodeJS & MongoDB Image by gOOvER - https://discord.goover.dev"
+msg RED "NodeJS & MongoDB Image by gOOvER - https://dsc.gg/goover"
 msg RED "This Image is licencend under AGPLv3"
 line BLUE
 msg YELLOW "Running on: ${RED}$(. /etc/os-release ; echo $NAME $VERSION)"

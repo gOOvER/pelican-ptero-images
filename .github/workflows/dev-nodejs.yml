@@ -36,6 +36,25 @@ jobs:
           - 24
           - 25
           - 26
+        include:
+          - tag: 12
+            base: node:12-bullseye-slim
+          - tag: 14
+            base: node:14-bullseye-slim
+          - tag: 16
+            base: node:16-bookworm-slim
+          - tag: 18
+            base: node:18-bookworm-slim
+          - tag: 20
+            base: node:20-trixie-slim
+          - tag: 22
+            base: node:22-trixie-slim
+          - tag: 24
+            base: node:24-trixie-slim
+          - tag: 25
+            base: node:25-trixie-slim
+          - tag: 26
+            base: node:26-trixie-slim
 
     steps:
       - uses: actions/checkout@v7
@@ -55,7 +74,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./dev/nodejs
-          file: ./dev/nodejs/${{ matrix.tag }}/Dockerfile
+          file: ./dev/nodejs/Dockerfile
+          build-args: |
+            NODE_BASE=${{ matrix.base }}
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

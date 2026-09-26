@@ -27,6 +27,7 @@ jobs:
       matrix:
         distro:
           - debian
+          - mono
           - ubuntu
 
     steps:

@@ -150,7 +150,7 @@ WINE_VER=$(wine --version 2>/dev/null || echo "Wine not found!")
 # ----------------------------
 clear
 line BLUE
-msg RED "Wine Image by gOOvER - https://discord.goover.dev"
+msg RED "Wine Image by gOOvER - https://dsc.gg/goover"
 msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
 msg YELLOW "System Information:"

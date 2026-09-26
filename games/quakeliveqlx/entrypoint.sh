@@ -62,7 +62,7 @@ INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}' 2>/dev/null || echo "1
 export INTERNAL_IP
 
 line BLUE
-msg RED "SteamCMD Image by gOOvER - https://discord.goover.dev"
+msg RED "SteamCMD Image by gOOvER - https://dsc.gg/goover"
 line BLUE
 msg YELLOW "Linux Distribution: ${RED}$(. /etc/os-release ; echo $PRETTY_NAME)"
 msg YELLOW "Current timezone: ${RED}$(cat /etc/timezone 2>/dev/null || echo $TZ)"

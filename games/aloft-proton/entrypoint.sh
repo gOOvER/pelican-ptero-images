@@ -19,7 +19,7 @@ INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
 export INTERNAL_IP
 
 echo -e "${BLUE}----------------------------------------------------------------------------------${NC}"
-    echo -e "${RED}SteamCMD Proton-GE Image by gOOvER - https://discord.goover.dev${NC}"
+    echo -e "${RED}SteamCMD Proton-GE Image by gOOvER - https://dsc.gg/goover${NC}"
 	echo -e "${RED}THIS IMAGE IS LICENSED UNDER AGPLv3${NC}"
     echo -e "${BLUE}----------------------------------------------------------------------------------${NC}"
     echo -e "${YELLOW}Linux Distribution: ${RED} $(. /etc/os-release ; echo $PRETTY_NAME)${NC}"

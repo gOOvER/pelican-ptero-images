@@ -87,7 +87,7 @@ DOTNET_VER=$(dotnet --version 2>/dev/null || echo ".NET not found")
 # ----------------------------
 clear
 line BLUE
-msg RED ".NET SDK Image by gOOvER - https://discord.goover.dev"
+msg RED ".NET SDK Image by gOOvER - https://dsc.gg/goover"
 msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
 msg YELLOW "Linux Distribution: ${RED}$LINUX"

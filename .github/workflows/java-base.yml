@@ -67,7 +67,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./java/base
-          file: ./java/base/${{ matrix.tag }}/Dockerfile
+          file: ./java/base/Dockerfile
+          build-args: |
+            JAVA_VERSION=${{ matrix.tag }}
           platforms: ${{ matrix.platform }}
           push: true
           network: host

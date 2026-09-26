@@ -52,7 +52,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./dev/elixir
-          file: ./dev/elixir/${{ matrix.tag }}/Dockerfile
+          file: ./dev/elixir/Dockerfile
+          build-args: |
+            ELIXIR_BASE=${{ matrix.tag == 'latest' && 'elixir:latest' || format('elixir:{0}-slim', matrix.tag) }}
           platforms: linux/amd64,linux/arm64
           push: true
           network: host

@@ -59,6 +59,14 @@ jobs:
             [ -d "$1" ]
           }
 
+          # Function to get versions from workflow matrix
+          get_workflow_matrix_tags() {
+            local wf="$1"
+            if [ -f "$wf" ]; then
+              sed -n "/matrix:/,/steps:/p" "$wf" | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | grep -v "/" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/" | sort -V -u
+            fi
+          }
+
           # Function to get arm64-excluded tags from a workflow YAML (one tag per line)
           get_arm64_excluded_tags() {
             local workflow="$1"
@@ -87,7 +95,13 @@ jobs:
 
           # Remove deleted DotNet versions
           for v in $(grep -oP 'dotnet:\K[0-9.]+(?= \|)' README.md | sort -u); do
-            if ! dir_exists "dev/dotnet/$v"; then
+            if [ -f "dev/dotnet/Dockerfile" ]; then
+              if ! get_workflow_matrix_tags ".github/workflows/dev-dotnet.yml" | grep -qxF "$v"; then
+                echo "  ➖ Removing dotnet:$v (no longer in workflow)"
+                sed -i "/| dotnet:$v /d" README.md
+                CHANGES_MADE="${CHANGES_MADE}Removed DotNet: $v\n"
+              fi
+            elif ! dir_exists "dev/dotnet/$v"; then
               echo "  ➖ Removing dotnet:$v (no longer exists)"
               sed -i "/| dotnet:$v /d" README.md
               CHANGES_MADE="${CHANGES_MADE}Removed DotNet: $v\n"
@@ -96,71 +110,46 @@ jobs:
 
           # Remove deleted Java Base versions
           for v in $(grep -oP '\| java:\K[0-9]+(?= \|)' README.md | sort -u); do
-            if ! dir_exists "java/base/$v"; then
+            if [ -f "java/base/Dockerfile" ]; then
+              if ! grep -q -E "-\s*['\"]?${v}['\"]?" .github/workflows/java-base.yml; then
+                echo "  ➖ Removing java:$v (no longer exists)"
+                sed -i "/| java:$v /d" README.md
+                CHANGES_MADE="${CHANGES_MADE}Removed Java Base: $v\n"
+              fi
+            elif ! dir_exists "java/base/$v"; then
               echo "  ➖ Removing java:$v (no longer exists)"
               sed -i "/| java:$v /d" README.md
               CHANGES_MADE="${CHANGES_MADE}Removed Java Base: $v\n"
             fi
           done
 
-          # Remove deleted Java GraalVM versions
-          for v in $(grep -oP 'java:graalvm_\K[0-9]+' README.md | sort -u); do
-            if ! dir_exists "java/graalvm/$v"; then
-              echo "  ➖ Removing java:graalvm_$v (no longer exists)"
-              sed -i "/| java:graalvm_$v /d" README.md
-              CHANGES_MADE="${CHANGES_MADE}Removed Java GraalVM: $v\n"
-            fi
-          done
-
-          # Remove deleted Java Corretto versions
-          for v in $(grep -oP 'java:corretto_\K[0-9]+' README.md | sort -u); do
-            if ! dir_exists "java/corretto/$v"; then
-              echo "  ➖ Removing java:corretto_$v (no longer exists)"
-              sed -i "/| java:corretto_$v /d" README.md
-              CHANGES_MADE="${CHANGES_MADE}Removed Java Corretto: $v\n"
-            fi
-          done
-
-          # Remove deleted Java Zulu versions
-          for v in $(grep -oP 'java:zulu_\K[0-9]+' README.md | sort -u); do
-            if ! dir_exists "java/zulu/$v"; then
-              echo "  ➖ Removing java:zulu_$v (no longer exists)"
-              sed -i "/| java:zulu_$v /d" README.md
-              CHANGES_MADE="${CHANGES_MADE}Removed Java Zulu: $v\n"
-            fi
-          done
-
-          # Remove deleted Java Dragonwell versions
-          for v in $(grep -oP 'java:dragonwell_\K[0-9]+' README.md | sort -u); do
-            if ! dir_exists "java/dragonwell/$v"; then
-              echo "  ➖ Removing java:dragonwell_$v (no longer exists)"
-              sed -i "/| java:dragonwell_$v /d" README.md
-              CHANGES_MADE="${CHANGES_MADE}Removed Java Dragonwell: $v\n"
-            fi
-          done
-
-          # Remove deleted Java Liberica versions
-          for v in $(grep -oP 'java:liberica_\K[0-9]+' README.md | sort -u); do
-            if ! dir_exists "java/liberica/$v"; then
-              echo "  ➖ Removing java:liberica_$v (no longer exists)"
-              sed -i "/| java:liberica_$v /d" README.md
-              CHANGES_MADE="${CHANGES_MADE}Removed Java Liberica: $v\n"
-            fi
-          done
-
-          # Remove deleted Java Shenandoah versions
-          for v in $(grep -oP 'java:shenandoah_\K[0-9]+' README.md | sort -u); do
-            if ! dir_exists "java/shenandoah/$v"; then
-              echo "  ➖ Removing java:shenandoah_$v (no longer exists)"
-              sed -i "/| java:shenandoah_$v /d" README.md
-              CHANGES_MADE="${CHANGES_MADE}Removed Java Shenandoah: $v\n"
-            fi
+          # Remove deleted Java variant versions (GraalVM, Corretto, Zulu, Dragonwell, Liberica, Shenandoah)
+          for jv in graalvm corretto zulu dragonwell liberica shenandoah; do
+            for v in $(grep -oP "java:${jv}_\K[0-9]+" README.md | sort -u); do
+              if [ -f "java/$jv/Dockerfile" ]; then
+                if ! grep -q -E "-\s*['\"]?${v}['\"]?" .github/workflows/java-$jv.yml; then
+                  echo "  ➖ Removing java:${jv}_$v (no longer exists)"
+                  sed -i "/| java:${jv}_$v /d" README.md
+                  CHANGES_MADE="${CHANGES_MADE}Removed Java ${jv^}: $v\n"
+                fi
+              elif ! dir_exists "java/$jv/$v"; then
+                echo "  ➖ Removing java:${jv}_$v (no longer exists)"
+                sed -i "/| java:${jv}_$v /d" README.md
+                CHANGES_MADE="${CHANGES_MADE}Removed Java ${jv^}: $v\n"
+              fi
+            done
           done
 
           # Remove deleted database versions
           for db in mariadb postgres mongodb redis; do
-            for v in $(grep -oP "${db}:\K[0-9.]+(?= \|)" README.md | sort -u); do
-              if ! dir_exists "database/$db/$v"; then
+            for v in $(grep -oP "${db}:\K[a-zA-Z0-9.-]+(?= \|)" README.md | sort -u); do
+              if [ -f "database/$db/Dockerfile" ] && [ -f ".github/workflows/db-$db.yml" ]; then
+                if ! grep -q -E "-\s*['\"]?${v}['\"]?" .github/workflows/db-$db.yml; then
+                  echo "  ➖ Removing $db:$v (no longer in workflow)"
+                  sed -i "/| $db:$v /d" README.md
+                  CHANGES_MADE="${CHANGES_MADE}Removed ${db^}: $v\n"
+                fi
+              elif ! dir_exists "database/$db/$v"; then
                 echo "  ➖ Removing $db:$v (no longer exists)"
                 sed -i "/| $db:$v /d" README.md
                 CHANGES_MADE="${CHANGES_MADE}Removed ${db^}: $v\n"
@@ -169,9 +158,15 @@ jobs:
           done
 
           # Remove deleted dev image versions
-          for dev in nodejs python go elixir; do
-            for v in $(grep -oP "${dev}:\K[0-9.]+(?= \|)" README.md | sort -u); do
-              if ! dir_exists "dev/$dev/$v"; then
+          for dev in nodejs python go elixir bun erlang dart rust mono; do
+            for v in $(grep -oP "${dev}:\K[a-zA-Z0-9.-]+(?= \|)" README.md | sort -u); do
+              if [ -f "dev/$dev/Dockerfile" ] && [ -f ".github/workflows/dev-$dev.yml" ]; then
+                if ! get_workflow_matrix_tags ".github/workflows/dev-$dev.yml" | grep -qxF "$v"; then
+                  echo "  ➖ Removing $dev:$v (no longer in workflow)"
+                  sed -i "/| $dev:$v /d" README.md
+                  CHANGES_MADE="${CHANGES_MADE}Removed ${dev^}: $v\n"
+                fi
+              elif ! dir_exists "dev/$dev/$v"; then
                 echo "  ➖ Removing $dev:$v (no longer exists)"
                 sed -i "/| $dev:$v /d" README.md
                 CHANGES_MADE="${CHANGES_MADE}Removed ${dev^}: $v\n"
@@ -197,6 +192,54 @@ jobs:
             fi
           done
 
+          # Remove deleted Debian distro versions
+          for deb in $(grep -oP 'debian:\K[a-z0-9-]+(?= \|)' README.md | sort -u); do
+            if ! dir_exists "distros/debian/$deb"; then
+              echo "  ➖ Removing debian:$deb (no longer exists)"
+              sed -i "/| debian:$deb /d" README.md
+              CHANGES_MADE="${CHANGES_MADE}Removed Debian: $deb\n"
+            fi
+          done
+
+          # Remove deleted Ubuntu distro versions
+          for ub in $(grep -oP 'ubuntu:\K[a-z0-9-]+(?= \|)' README.md | sort -u); do
+            if ! dir_exists "distros/ubuntu/$ub"; then
+              echo "  ➖ Removing ubuntu:$ub (no longer exists)"
+              sed -i "/| ubuntu:$ub /d" README.md
+              CHANGES_MADE="${CHANGES_MADE}Removed Ubuntu: $ub\n"
+            fi
+          done
+
+          # Remove deleted Alpine distro versions
+          for alp in $(grep -oP 'alpine:\K(latest|edge)(?= \|)' README.md | sort -u); do
+            if [ -f "distros/alpine/Dockerfile" ]; then
+              if ! get_workflow_matrix_tags ".github/workflows/distros-alpine.yml" | grep -qxF "$alp"; then
+                echo "  ➖ Removing alpine:$alp (no longer in workflow)"
+                sed -i "/| alpine:$alp /d" README.md
+                CHANGES_MADE="${CHANGES_MADE}Removed Alpine Distro: $alp\n"
+              fi
+            elif ! dir_exists "distros/alpine/$alp"; then
+              echo "  ➖ Removing alpine:$alp (no longer exists)"
+              sed -i "/| alpine:$alp /d" README.md
+              CHANGES_MADE="${CHANGES_MADE}Removed Alpine Distro: $alp\n"
+            fi
+          done
+
+          # Remove deleted Arch Linux distro versions
+          for arch in $(grep -oP 'archlinux:\K[a-z0-9-]+(?= \|)' README.md | sort -u); do
+            if [ -f "distros/archlinux/Dockerfile" ]; then
+              if ! get_workflow_matrix_tags ".github/workflows/distros-archlinux.yml" | grep -qxF "$arch"; then
+                echo "  ➖ Removing archlinux:$arch (no longer in workflow)"
+                sed -i "/| archlinux:$arch /d" README.md
+                CHANGES_MADE="${CHANGES_MADE}Removed Arch Linux: $arch\n"
+              fi
+            elif ! dir_exists "distros/archlinux/$arch"; then
+              echo "  ➖ Removing archlinux:$arch (no longer exists)"
+              sed -i "/| archlinux:$arch /d" README.md
+              CHANGES_MADE="${CHANGES_MADE}Removed Arch Linux: $arch\n"
+            fi
+          done
+
           # ============================================
           # ADD NEW IMAGES
           # ============================================
@@ -207,7 +250,12 @@ jobs:
           # Check Java Base versions
           # ============================================
           echo "📦 Checking Java Base..."
-          for v in $(get_versions "java/base"); do
+          if [ -f "java/base/Dockerfile" ]; then
+            base_versions=$(sed -n "/matrix:/,/steps:/p" .github/workflows/java-base.yml | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | grep -v "/" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/" | sort -V -u)
+          else
+            base_versions=$(get_versions "java/base")
+          fi
+          for v in $base_versions; do
             if ! check_image "java:$v "; then
               echo "  ➕ Adding java:$v"
               last_java=$(grep -n "| java:[0-9]" README.md | tail -1 | cut -d: -f1)
@@ -219,78 +267,25 @@ jobs:
           done
 
           # ============================================
-          # Check Java GraalVM versions
+          # Check Java variant versions (GraalVM, Corretto, Zulu, Dragonwell, Liberica)
           # ============================================
-          echo "📦 Checking Java GraalVM..."
-          for v in $(get_versions "java/graalvm"); do
-            if ! check_image "java:graalvm_$v "; then
-              echo "  ➕ Adding java:graalvm_$v"
-              last_graalvm=$(grep -n "| java:graalvm_" README.md | tail -1 | cut -d: -f1)
-              if [ -n "$last_graalvm" ]; then
-                sed -i "${last_graalvm}a\\| java:graalvm_$v | \`ghcr.io/goover/java:graalvm_$v\` | ✅ | ✅ |" README.md
-                CHANGES_MADE="${CHANGES_MADE}Added Java GraalVM: $v\n"
-              fi
+          for jv in graalvm corretto zulu dragonwell liberica; do
+            echo "📦 Checking Java ${jv^}..."
+            if [ -f "java/$jv/Dockerfile" ]; then
+              jv_versions=$(sed -n "/matrix:/,/steps:/p" .github/workflows/java-$jv.yml | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | grep -v "/" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/" | sort -V -u)
+            else
+              jv_versions=$(get_versions "java/$jv")
             fi
-          done
-
-          # ============================================
-          # Check Java Corretto versions
-          # ============================================
-          echo "📦 Checking Java Corretto..."
-          for v in $(get_versions "java/corretto"); do
-            if ! check_image "java:corretto_$v "; then
-              echo "  ➕ Adding java:corretto_$v"
-              last_corretto=$(grep -n "| java:corretto_" README.md | tail -1 | cut -d: -f1)
-              if [ -n "$last_corretto" ]; then
-                sed -i "${last_corretto}a\\| java:corretto_$v | \`ghcr.io/goover/java:corretto_$v\` | ✅ | ✅ |" README.md
-                CHANGES_MADE="${CHANGES_MADE}Added Java Corretto: $v\n"
+            for v in $jv_versions; do
+              if ! check_image "java:${jv}_$v "; then
+                echo "  ➕ Adding java:${jv}_$v"
+                last_jv=$(grep -n "| java:${jv}_" README.md | tail -1 | cut -d: -f1)
+                if [ -n "$last_jv" ]; then
+                  sed -i "${last_jv}a\\| java:${jv}_$v | \`ghcr.io/goover/java:${jv}_$v\` | ✅ | ✅ |" README.md
+                  CHANGES_MADE="${CHANGES_MADE}Added Java ${jv^}: $v\n"
+                fi
               fi
-            fi
-          done
-
-          # ============================================
-          # Check Java Zulu versions
-          # ============================================
-          echo "📦 Checking Java Zulu..."
-          for v in $(get_versions "java/zulu"); do
-            if ! check_image "java:zulu_$v "; then
-              echo "  ➕ Adding java:zulu_$v"
-              last_zulu=$(grep -n "| java:zulu_" README.md | tail -1 | cut -d: -f1)
-              if [ -n "$last_zulu" ]; then
-                sed -i "${last_zulu}a\\| java:zulu_$v | \`ghcr.io/goover/java:zulu_$v\` | ✅ | ✅ |" README.md
-                CHANGES_MADE="${CHANGES_MADE}Added Java Zulu: $v\n"
-              fi
-            fi
-          done
-
-          # ============================================
-          # Check Java Dragonwell versions
-          # ============================================
-          echo "📦 Checking Java Dragonwell..."
-          for v in $(get_versions "java/dragonwell"); do
-            if ! check_image "java:dragonwell_$v "; then
-              echo "  ➕ Adding java:dragonwell_$v"
-              last_dragonwell=$(grep -n "| java:dragonwell_" README.md | tail -1 | cut -d: -f1)
-              if [ -n "$last_dragonwell" ]; then
-                sed -i "${last_dragonwell}a\\| java:dragonwell_$v | \`ghcr.io/goover/java:dragonwell_$v\` | ✅ | ✅ |" README.md
-                CHANGES_MADE="${CHANGES_MADE}Added Java Dragonwell: $v\n"
-              fi
-            fi
-          done
-
-          # ============================================
-          # Check Java Liberica versions
-          # ============================================
-          echo "📦 Checking Java Liberica..."
-          for v in $(get_versions "java/liberica"); do
-            if ! check_image "java:liberica_$v "; then
-              echo "  ➕ Adding java:liberica_$v"
-              last_liberica=$(grep -n "| java:liberica_" README.md | tail -1 | cut -d: -f1)
-              if [ -n "$last_liberica" ]; then
-                sed -i "${last_liberica}a\\| java:liberica_$v | \`ghcr.io/goover/java:liberica_$v\` | ✅ | ✅ |" README.md
-                CHANGES_MADE="${CHANGES_MADE}Added Java Liberica: $v\n"
-              fi
-            fi
+            done
           done
 
           # ============================================
@@ -298,7 +293,12 @@ jobs:
           # ============================================
           echo "📦 Checking Java Shenandoah..."
           shenandoah_excluded=$(get_arm64_excluded_tags ".github/workflows/java-shenandoah.yml")
-          for v in $(get_versions "java/shenandoah"); do
+          if [ -f "java/shenandoah/Dockerfile" ]; then
+            shen_versions=$(sed -n "/matrix:/,/steps:/p" .github/workflows/java-shenandoah.yml | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | grep -v "/" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/" | sort -V -u)
+          else
+            shen_versions=$(get_versions "java/shenandoah")
+          fi
+          for v in $shen_versions; do
             if ! check_image "java:shenandoah_$v "; then
               echo "  ➕ Adding java:shenandoah_$v"
               last_shenandoah=$(grep -n "| java:shenandoah_" README.md | tail -1 | cut -d: -f1)
@@ -319,7 +319,12 @@ jobs:
           # ============================================
           for db in mariadb postgres mongodb redis; do
             echo "📦 Checking $db..."
-            for v in $(get_versions "database/$db"); do
+            if [ -f "database/$db/Dockerfile" ] && [ -f ".github/workflows/db-$db.yml" ]; then
+              db_versions=$(sed -n "/matrix:/,/steps:/p" .github/workflows/db-$db.yml | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/")
+            else
+              db_versions=$(get_versions "database/$db")
+            fi
+            for v in $db_versions; do
               if ! check_image "$db:$v "; then
                 echo "  ➕ Adding $db:$v"
                 last_db=$(grep -n "| $db:" README.md | tail -1 | cut -d: -f1)
@@ -336,7 +341,12 @@ jobs:
           # ============================================
           for dev in nodejs python go elixir; do
             echo "📦 Checking $dev..."
-            for v in $(get_versions "dev/$dev"); do
+            if [ -f "dev/$dev/Dockerfile" ] && [ -f ".github/workflows/dev-$dev.yml" ]; then
+              dev_versions=$(get_workflow_matrix_tags ".github/workflows/dev-$dev.yml")
+            else
+              dev_versions=$(get_versions "dev/$dev")
+            fi
+            for v in $dev_versions; do
               if ! check_image "$dev:$v "; then
                 echo "  ➕ Adding $dev:$v"
                 last_dev=$(grep -n "| $dev:" README.md | tail -1 | cut -d: -f1)
@@ -352,12 +362,17 @@ jobs:
           # Check DotNet versions
           # ============================================
           echo "📦 Checking dotnet..."
-          for v in $(get_versions "dev/dotnet"); do
+          if [ -f "dev/dotnet/Dockerfile" ]; then
+            dotnet_versions=$(get_workflow_matrix_tags ".github/workflows/dev-dotnet.yml")
+          else
+            dotnet_versions=$(get_versions "dev/dotnet")
+          fi
+          for v in $dotnet_versions; do
             if ! check_image "dotnet:$v "; then
               echo "  ➕ Adding dotnet:$v"
               last_dotnet=$(grep -n "| dotnet:" README.md | tail -1 | cut -d: -f1)
               if [ -n "$last_dotnet" ]; then
-                sed -i "${last_dotnet}a\\| dotnet:$v | \`ghcr.io/goover/dotnet:$v\` | ✅ | ❌ |" README.md
+                sed -i "${last_dotnet}a\\| dotnet:$v | \`ghcr.io/goover/dotnet:$v\` | ✅ | ✅ |" README.md
                 CHANGES_MADE="${CHANGES_MADE}Added DotNet: $v\n"
               fi
             fi
@@ -394,6 +409,76 @@ jobs:
           done
 
           # ============================================
+          # Check Debian distro versions
+          # ============================================
+          echo "📦 Checking Debian distros..."
+          for v in $(get_subdirs "distros/debian"); do
+            if ! check_image "debian:$v "; then
+              echo "  ➕ Adding debian:$v"
+              last_deb=$(grep -n "| debian:" README.md | tail -1 | cut -d: -f1)
+              if [ -n "$last_deb" ]; then
+                sed -i "${last_deb}a\\| debian:$v | \`ghcr.io/goover/debian:$v\` | ✅ | ✅ |" README.md
+                CHANGES_MADE="${CHANGES_MADE}Added Debian: $v\n"
+              fi
+            fi
+          done
+
+          # ============================================
+          # Check Ubuntu distro versions
+          # ============================================
+          echo "📦 Checking Ubuntu distros..."
+          for v in $(get_subdirs "distros/ubuntu"); do
+            if ! check_image "ubuntu:$v "; then
+              echo "  ➕ Adding ubuntu:$v"
+              last_ub=$(grep -n "| ubuntu:" README.md | tail -1 | cut -d: -f1)
+              if [ -n "$last_ub" ]; then
+                sed -i "${last_ub}a\\| ubuntu:$v | \`ghcr.io/goover/ubuntu:$v\` | ✅ | ✅ |" README.md
+                CHANGES_MADE="${CHANGES_MADE}Added Ubuntu: $v\n"
+              fi
+            fi
+          done
+
+          # ============================================
+          # Check Alpine distro versions
+          # ============================================
+          echo "📦 Checking Alpine distros..."
+          if [ -f "distros/alpine/Dockerfile" ]; then
+            alp_versions=$(get_workflow_matrix_tags ".github/workflows/distros-alpine.yml")
+          else
+            alp_versions=$(get_subdirs "distros/alpine")
+          fi
+          for v in $alp_versions; do
+            if ! check_image "alpine:$v "; then
+              echo "  ➕ Adding alpine:$v"
+              last_alp=$(grep -n -E "\| alpine:(latest|edge)" README.md | tail -1 | cut -d: -f1)
+              if [ -n "$last_alp" ]; then
+                sed -i "${last_alp}a\\| alpine:$v | \`ghcr.io/goover/alpine:$v\` | ✅ | ✅ |" README.md
+                CHANGES_MADE="${CHANGES_MADE}Added Alpine Distro: $v\n"
+              fi
+            fi
+          done
+
+          # ============================================
+          # Check Arch Linux distro versions
+          # ============================================
+          echo "📦 Checking Arch Linux distros..."
+          if [ -f "distros/archlinux/Dockerfile" ]; then
+            arch_versions=$(get_workflow_matrix_tags ".github/workflows/distros-archlinux.yml")
+          else
+            arch_versions=$(get_subdirs "distros/archlinux")
+          fi
+          for v in $arch_versions; do
+            if ! check_image "archlinux:$v "; then
+              echo "  ➕ Adding archlinux:$v"
+              last_arch=$(grep -n "| archlinux:" README.md | tail -1 | cut -d: -f1)
+              if [ -n "$last_arch" ]; then
+                sed -i "${last_arch}a\\| archlinux:$v | \`ghcr.io/goover/archlinux:$v\` | ✅ | ❌ |" README.md
+                CHANGES_MADE="${CHANGES_MADE}Added Arch Linux: $v\n"
+              fi
+            fi
+          done
+
+          # ============================================
           # UPDATE ARM64 STATUS FOR EXISTING ENTRIES
           # Reads each workflow's exclude list and syncs
           # the ARM64 column in the README accordingly.
@@ -414,7 +499,12 @@ jobs:
           for variant in "${!JAVA_WORKFLOWS[@]}"; do
             workflow="${JAVA_WORKFLOWS[$variant]}"
             excluded=$(get_arm64_excluded_tags "$workflow")
-            for v in $(get_versions "java/$variant"); do
+            if [ -f "java/$variant/Dockerfile" ]; then
+              jv_list=$(get_workflow_matrix_tags "$workflow")
+            else
+              jv_list=$(get_versions "java/$variant")
+            fi
+            for v in $jv_list; do
               if [ "$variant" = "base" ]; then
                 image="java:$v"
               else

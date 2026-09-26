@@ -70,7 +70,7 @@ WORKDIR     /home/container
 # Sets the default stop signal as wings can (currently) only send a kill or generic stop
 STOPSIGNAL SIGINT
 
-COPY        --chown=container:container ../entrypoint.sh /entrypoint.sh
+COPY        --chown=container:container ./entrypoint.sh /entrypoint.sh
 RUN         chmod +x /entrypoint.sh
 ENTRYPOINT  ["/usr/bin/tini", "-g", "--"]
 CMD         ["/entrypoint.sh"]

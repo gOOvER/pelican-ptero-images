@@ -68,7 +68,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./java/zulu
-          file: ./java/zulu/${{ matrix.tag }}/Dockerfile
+          file: ./java/zulu/Dockerfile
+          build-args: |
+            JAVA_VERSION=${{ matrix.tag }}
           platforms: ${{ matrix.platform }}
           push: true
           network: host

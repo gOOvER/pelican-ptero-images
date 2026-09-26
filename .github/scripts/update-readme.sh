@@ -54,6 +54,14 @@ check_arm64_support() {
 # Generate Image Tables
 # =============================================================================
 
+get_java_versions() {
+    local java_type="$1"
+    local wf="$REPO_ROOT/.github/workflows/java-$java_type.yml"
+    if [ -f "$wf" ]; then
+        sed -n "/matrix:/,/steps:/p" "$wf" | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | grep -v "/" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/" | sort -V -u
+    fi
+}
+
 generate_java_table() {
     local java_type="$1"
     local display_name="$2"
@@ -68,15 +76,34 @@ generate_java_table() {
     echo "| Image | URI | AMD64 | ARM64 |"
     echo "|-------|:---:|:-----:|:-----:|"
 
-    for version in $(get_versions "$dir"); do
+    local versions=""
+    if [ -f "$dir/Dockerfile" ]; then
+        versions=$(get_java_versions "$java_type")
+    else
+        versions=$(get_versions "$dir")
+    fi
+
+    for version in $versions; do
         local dockerfile="$dir/$version/Dockerfile"
+        [ ! -f "$dockerfile" ] && dockerfile="$dir/Dockerfile"
         local arm64=$(check_arm64_support "$dockerfile")
+        if [ "$java_type" = "shenandoah" ] && [ "$version" = "8" -o "$version" = "11" ]; then
+            arm64="❌"
+        fi
         if [ -n "$tag_prefix" ]; then
             echo "| java:${tag_prefix}_${version} | \`${REGISTRY}/java:${tag_prefix}_${version}\` | ✅ | ${arm64} |"
         else
             echo "| java:${version} | \`${REGISTRY}/java:${version}\` | ✅ | ${arm64} |"
         fi
     done
+}
+
+get_database_versions() {
+    local db_type="$1"
+    local wf="$REPO_ROOT/.github/workflows/db-$db_type.yml"
+    if [ -f "$wf" ]; then
+        sed -n "/matrix:/,/steps:/p" "$wf" | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/"
+    fi
 }
 
 generate_database_table() {
@@ -91,8 +118,16 @@ generate_database_table() {
     echo "| Image | URI | AMD64 | ARM64 |"
     echo "|-------|:---:|:-----:|:-----:|"
 
-    for version in $(get_versions "$dir"); do
+    local versions=""
+    if [ -f "$dir/Dockerfile" ]; then
+        versions=$(get_database_versions "$db_type")
+    else
+        versions=$(get_versions "$dir")
+    fi
+
+    for version in $versions; do
         local dockerfile="$dir/$version/Dockerfile"
+        [ ! -f "$dockerfile" ] && dockerfile="$dir/Dockerfile"
         local arm64=$(check_arm64_support "$dockerfile")
         echo "| ${db_type}:${version} | \`${REGISTRY}/${db_type}:${version}\` | ✅ | ${arm64} |"
     done
@@ -124,7 +159,11 @@ generate_simple_table() {
                     dockerfile="$dir/$item/$subitem/Dockerfile"
                     if [ -f "$dockerfile" ]; then
                         local arm64=$(check_arm64_support "$dockerfile")
-                        echo "| ${image_name}:${item}_${subitem} | \`${REGISTRY}/${image_name}:${item}_${subitem}\` | ✅ | ${arm64} |"
+                        if [ "$category" = "distros" ]; then
+                            echo "| ${item}:${subitem} | \`${REGISTRY}/${item}:${subitem}\` | ✅ | ${arm64} |"
+                        else
+                            echo "| ${image_name}:${item}_${subitem} | \`${REGISTRY}/${image_name}:${item}_${subitem}\` | ✅ | ${arm64} |"
+                        fi
                     fi
                 done
             fi
@@ -157,7 +196,13 @@ generate_images_json() {
 
             echo -n "      \"$java_type\": [" >> "$output_file"
             local first_version=true
-            for version in $(get_versions "$dir"); do
+            local versions=""
+            if [ -f "$dir/Dockerfile" ]; then
+                versions=$(get_java_versions "$java_type")
+            else
+                versions=$(get_versions "$dir")
+            fi
+            for version in $versions; do
                 if [ "$first_version" = false ]; then
                     echo -n ", " >> "$output_file"
                 fi
@@ -185,7 +230,13 @@ generate_images_json() {
 
             echo -n "      \"$db_type\": [" >> "$output_file"
             local first_version=true
-            for version in $(get_versions "$dir"); do
+            local versions=""
+            if [ -f "$dir/Dockerfile" ]; then
+                versions=$(get_database_versions "$db_type")
+            else
+                versions=$(get_versions "$dir")
+            fi
+            for version in $versions; do
                 if [ "$first_version" = false ]; then
                     echo -n ", " >> "$output_file"
                 fi
@@ -208,6 +259,13 @@ generate_images_json() {
 # Count Images
 # =============================================================================
 
+get_workflow_matrix_tags() {
+    local wf="$1"
+    if [ -f "$wf" ]; then
+        sed -n "/matrix:/,/steps:/p" "$wf" | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | grep -v "/" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/" | sort -V -u
+    fi
+}
+
 count_images() {
     local count=0
 
@@ -215,20 +273,56 @@ count_images() {
     for java_type in base graalvm corretto zulu dragonwell liberica shenandoah; do
         local dir="$REPO_ROOT/java/$java_type"
         if [ -d "$dir" ]; then
-            count=$((count + $(get_versions "$dir" | wc -l)))
+            if [ -f "$dir/Dockerfile" ]; then
+                local jv_cnt=$(get_java_versions "$java_type" | wc -l)
+                count=$((count + jv_cnt))
+            else
+                count=$((count + $(get_versions "$dir" | wc -l)))
+            fi
         fi
     done
 
     # Count Database images
-    for db_type in mariadb postgres mongodb redis; do
+    for db_type in mariadb postgres mongodb redis keydb; do
         local dir="$REPO_ROOT/database/$db_type"
         if [ -d "$dir" ]; then
-            count=$((count + $(get_versions "$dir" | wc -l)))
+            if [ -f "$dir/Dockerfile" ]; then
+                local db_cnt=$(get_database_versions "$db_type" | wc -l)
+                count=$((count + db_cnt))
+            else
+                count=$((count + $(get_versions "$dir" | wc -l)))
+            fi
+        fi
+    done
+
+    # Count Dev images
+    for dev in nodejs python go bun erlang dart elixir dotnet mono rust; do
+        local dir="$REPO_ROOT/dev/$dev"
+        if [ -d "$dir" ]; then
+            if [ -f "$dir/Dockerfile" ]; then
+                local dev_cnt=$(get_workflow_matrix_tags "$REPO_ROOT/.github/workflows/dev-$dev.yml" | wc -l)
+                count=$((count + dev_cnt))
+            else
+                count=$((count + $(get_versions "$dir" | wc -l)))
+            fi
+        fi
+    done
+
+    # Count Distros
+    for distro in debian ubuntu alpine archlinux; do
+        local dir="$REPO_ROOT/distros/$distro"
+        if [ -d "$dir" ]; then
+            if [ -f "$dir/Dockerfile" ]; then
+                local dist_cnt=$(get_workflow_matrix_tags "$REPO_ROOT/.github/workflows/distros-$distro.yml" | wc -l)
+                count=$((count + dist_cnt))
+            else
+                count=$((count + $(get_subdirs "$dir" | wc -l)))
+            fi
         fi
     done
 
     # Count other categories
-    for category in dev/nodejs dev/python dev/go steam steamcmd wine games bots apps distros installers; do
+    for category in steam steamcmd wine games bots apps installers; do
         local dir="$REPO_ROOT/$category"
         if [ -d "$dir" ]; then
             count=$((count + $(get_subdirs "$dir" | wc -l)))

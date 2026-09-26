@@ -56,7 +56,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./dev/go
-          file: ./dev/go/${{ matrix.tag }}/Dockerfile
+          file: ./dev/go/Dockerfile
+          build-args: |
+            GO_VERSION=${{ matrix.tag }}
           platforms: linux/amd64
           push: true
           network: host

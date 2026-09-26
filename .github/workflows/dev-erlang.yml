@@ -47,7 +47,9 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: ./dev/erlang
-          file: ./dev/erlang/${{ matrix.tag }}/Dockerfile
+          file: ./dev/erlang/Dockerfile
+          build-args: |
+            ERLANG_VERSION=${{ matrix.tag }}
           platforms: linux/amd64
           push: true
           network: host

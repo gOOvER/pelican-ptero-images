@@ -45,8 +45,10 @@ jobs:
 
       - uses: docker/build-push-action@v7
         with:
-          context: ./distros/archlinux/${{ matrix.oses }}
-          file: ./distros/archlinux/${{ matrix.oses }}/Dockerfile
+          context: ./distros/archlinux
+          file: ./distros/archlinux/Dockerfile
+          build-args: |
+            ARCH_TAG=${{ matrix.oses }}
           platforms: linux/amd64
           push: true
           network: host
