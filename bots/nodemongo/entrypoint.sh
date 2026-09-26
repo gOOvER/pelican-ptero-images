@@ -299,7 +299,7 @@ MODIFIED_STARTUP=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 msg CYAN ":/home/container$ $MODIFIED_STARTUP"
 
 # exec bash -c für komplexe Shell-Kommandos
-eval "$MODIFIED_STARTUP"
+exec bash -c "$MODIFIED_STARTUP"
 
 # stop mongo with correct dbpath
 mongod --dbpath /home/container/mongodb/ --shutdown

@@ -29,8 +29,12 @@ export INTERNAL_IP
 cd /home/container
 
 # Replace Startup Variables
-MODIFIED_STARTUP=$(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')
+MODIFIED_STARTUP=$(echo -e "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 echo -e ":/home/container$ ${MODIFIED_STARTUP}"
 
 # Run the Server
-eval ${MODIFIED_STARTUP}
+if command -v bash >/dev/null 2>&1; then
+    exec bash -c "${MODIFIED_STARTUP}"
+else
+    exec sh -c "${MODIFIED_STARTUP}"
+fi

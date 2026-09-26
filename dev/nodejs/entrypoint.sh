@@ -76,7 +76,7 @@ TZ=${TZ:-UTC}
 export TZ
 
 # Set environment variable that holds the Internal Docker IP
-INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || true)
+INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || echo "127.0.0.1")
 if [ -z "$INTERNAL_IP" ]; then
 	# Fallback: try hostname -I or 127.0.0.1
 	INTERNAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || true)

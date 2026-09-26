@@ -17,18 +17,18 @@ echo -e "${YELLOW}Redis Version:${NC} " && redis-server --version
 echo -e "${YELLOW}NodeJS Version:${NC} " && node -v
 echo -e "${YELLOW}NPM Version:${NC} " && npm -v
 #echo -e "${YELLOW}Java Version:${NC} " && java -version
-echo -e "${YELLOW}echo -e "${YELLOW}Linux Distribution: ${RED} $(. /etc/os-release ; echo $PRETTY_NAME)${NC}":${NC} " && cat /etc/debian_version
-echo -e "${YELLOW}Current timezone:${NC} " && cat /etc/timezone
+echo -e "${YELLOW}Linux Distribution: ${RED} $(. /etc/os-release ; echo $PRETTY_NAME)${NC}"
+echo -e "${YELLOW}Current timezone:${NC} " && ([ -f /etc/timezone ] && cat /etc/timezone || echo "${TZ:-UTC}")
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
 
 cd /home/container
 
 # Set environment variable that holds the Internal Docker IP
-INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
+INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || echo "127.0.0.1")
 export INTERNAL_IP
 
 # Replace Startup Variables
-MODIFIED_STARTUP=$(echo -e $(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g'))
+MODIFIED_STARTUP=$(echo -e "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 echo -e "${YELLOW}:/home/container${NC} ${MODIFIED_STARTUP}"
 
 # start mongo
@@ -41,8 +41,6 @@ mongod --fork --dbpath /home/container/mongodb/ --port 27017 --logpath /home/con
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
 echo -e "${YELLOW}starting Screeps Server${NC}"
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
-eval ${MODIFIED_STARTUP}
-
-# stop mongo
-mongod --shutdown
+trap "mongod --shutdown" EXIT INT TERM
+exec bash -c "${MODIFIED_STARTUP}"
 

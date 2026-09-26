@@ -3,11 +3,11 @@ cd /home/container
 
 # Information output
 echo "echo -e "${YELLOW}Linux Distribution: ${RED} $(. /etc/os-release ; echo $PRETTY_NAME)${NC}" $(cat /etc/debian_version)"
-echo "Current timezone: $(cat /etc/timezone)"
+echo "Current timezone: $([ -f /etc/timezone ] && cat /etc/timezone || echo "${TZ:-UTC}")"
 wine --version
 
 # Set environment variable that holds the Internal Docker IP
-INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
+INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || echo "127.0.0.1")
 export INTERNAL_IP
 
 ## just in case someone removed the defaults.
@@ -84,5 +84,9 @@ MODIFIED_STARTUP=$(echo ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')
 echo ":/home/container$ ${MODIFIED_STARTUP}"
 
 # Run the Server
-eval ${MODIFIED_STARTUP}
+if command -v bash >/dev/null 2>&1; then
+    exec bash -c "${MODIFIED_STARTUP}"
+else
+    exec sh -c "${MODIFIED_STARTUP}"
+fi
 

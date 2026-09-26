@@ -77,15 +77,20 @@ line BLUE
 # Environment
 # ----------------------------
 export TZ=${TZ:-UTC}
-export INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
+export INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || echo "127.0.0.1")
 
 cd /home/container || { msg RED "Failed to change directory to /home/container."; exit 1; }
 
 # ----------------------------
 # Startup
 # ----------------------------
-MODIFIED_STARTUP=$(echo -e $(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g'))
+MODIFIED_STARTUP=$(echo -e "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 echo -e ":/home/container$ ${MODIFIED_STARTUP}"
 
-eval ${MODIFIED_STARTUP}
+# Run the Server
+if command -v bash >/dev/null 2>&1; then
+    exec bash -c "${MODIFIED_STARTUP}"
+else
+    exec sh -c "${MODIFIED_STARTUP}"
+fi
 

@@ -32,7 +32,7 @@ line() {
     msg "$color" "$sep"
 }
 
-INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
+INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || echo "127.0.0.1")
 export INTERNAL_IP
 
 cd /home/container || exit 1
@@ -464,8 +464,13 @@ msg CYAN "Then follow the instructions to visit: https://accounts.hytale.com/dev
 msg CYAN "and enter the code displayed by the server."
 line "CYAN"
 
-PARSED=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g' | eval echo "$(cat -)")
+MODIFIED_STARTUP=$(echo -e "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
+printf "[1m[33mcontainer~ [0m%s
+" "$MODIFIED_STARTUP"
 
-printf "\033[1m\033[33mcontainer~ \033[0m"
-echo "$PARSED"
-exec env ${PARSED}
+# Run the Server
+if command -v bash >/dev/null 2>&1; then
+    exec bash -c "${MODIFIED_STARTUP}"
+else
+    exec sh -c "${MODIFIED_STARTUP}"
+fi

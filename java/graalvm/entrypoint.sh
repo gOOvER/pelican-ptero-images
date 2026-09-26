@@ -69,7 +69,7 @@ TZ=${TZ:-UTC}
 export TZ
 
 # Set environment variable that holds the Internal Docker IP
-INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
+INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || echo "127.0.0.1")
 export INTERNAL_IP
 
 # ----------------------------
@@ -102,6 +102,9 @@ PARSED=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g' | envsubst)
 msg CYAN ":/home/container$ ${PARSED}"
 
 # Execute the startup command
-# shellcheck disable=SC2086
-exec env ${PARSED}
+if command -v bash >/dev/null 2>&1; then
+    exec bash -c "${PARSED}"
+else
+    exec sh -c "${PARSED}"
+fi
 

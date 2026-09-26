@@ -10,7 +10,7 @@ TZ=${TZ:-UTC}
 export TZ
 
 # Set environment variable that holds the Internal Docker IP
-INTERNAL_IP=$(ip route get 1 | awk '{print $NF;exit}')
+INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || echo "127.0.0.1")
 export INTERNAL_IP
 
 mkdir -p /home/container/.steam/steam/steamapps/compatdata/${STEAM_APPID}
@@ -20,7 +20,7 @@ export STEAM_COMPAT_DATA_PATH="/home/container/.steam/steam/steamapps/compatdata
 # Convert all of the "{{VARIABLE}}" parts of the command into the expected shell
 # variable format of "${VARIABLE}" before evaluating the string and automatically
 # replacing the values.
-PARSED=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g' | eval echo "$(cat -)")
+MODIFIED_STARTUP=$(echo -e "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 
 ## just in case someone removed the defaults.
 if [ "${STEAM_USER:-}" == "" ]; then
@@ -50,7 +50,12 @@ Xvfb :0 -screen 0 1024x768x16 &
 
 # Display the command we're running in the output, and then execute it with the env
 # from the container itself.
-printf "\033[1m\033[33mcontainer@gameservertech~ \033[0m%s\n" "$PARSED"
-# shellcheck disable=SC2086
-exec env ${PARSED}
+printf "[1m[33mcontainer@gameservertech~ [0m%s
+" "$MODIFIED_STARTUP"
+# Run the Server
+if command -v bash >/dev/null 2>&1; then
+    exec bash -c "${MODIFIED_STARTUP}"
+else
+    exec sh -c "${MODIFIED_STARTUP}"
+fi
 

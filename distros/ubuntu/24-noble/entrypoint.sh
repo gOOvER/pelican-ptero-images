@@ -18,7 +18,7 @@ TZ=${TZ:-UTC}
 export TZ
 
 # Set environment variable that holds the Internal Docker IP
-INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
+INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || echo "127.0.0.1")
 export INTERNAL_IP
 
 # system informations
@@ -26,13 +26,17 @@ echo -e "${BLUE}----------------------------------------------------------------
 echo -e "${RED}Ubuntu Image by gOOvER - https://dsc.gg/goover${NC}"
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
 echo -e "${YELLOW}Running on Ubuntu ${RED} $(cat /etc/debian_version)${NC}"
-echo -e "${YELLOW}Current timezone: ${RED} $(cat /etc/timezone)${NC}"
+echo -e "${YELLOW}Current timezone: ${RED} $([ -f /etc/timezone ] && cat /etc/timezone || echo "${TZ:-UTC}")${NC}"
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
 
 # Replace Startup Variables
-MODIFIED_STARTUP=$(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')
+MODIFIED_STARTUP=$(echo -e "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 echo -e ":/home/container$ ${MODIFIED_STARTUP}"
 
 # Run the Server
-eval ${MODIFIED_STARTUP}
+if command -v bash >/dev/null 2>&1; then
+    exec bash -c "${MODIFIED_STARTUP}"
+else
+    exec sh -c "${MODIFIED_STARTUP}"
+fi
 

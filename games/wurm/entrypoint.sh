@@ -18,12 +18,12 @@ export TZ
 # Information output
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
 echo -e "${YELLOW}echo -e "${YELLOW}Linux Distribution: ${RED} $(. /etc/os-release ; echo $PRETTY_NAME)${NC}" $(cat /etc/debian_version)${NC}"
-echo -e "${YELLOW}Current timezone: $(cat /etc/timezone)${NC}"
+echo -e "${YELLOW}Current timezone: $([ -f /etc/timezone ] && cat /etc/timezone || echo "${TZ:-UTC}")${NC}"
 echo -e "${YELLOW}Java Version:${NC} ${RED} $(java -version)${NC}"
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
 
 # Set environment variable that holds the Internal Docker IP
-INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
+INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || echo "127.0.0.1")
 export INTERNAL_IP
 
 # Switch to the container's working directory
@@ -76,5 +76,9 @@ MODIFIED_STARTUP="${MODIFIED_STARTUP//\}\}/\}}"
 echo ":/home/container$ ${MODIFIED_STARTUP}"
 
 # Run the Server
-eval ${MODIFIED_STARTUP}
+if command -v bash >/dev/null 2>&1; then
+    exec bash -c "${MODIFIED_STARTUP}"
+else
+    exec sh -c "${MODIFIED_STARTUP}"
+fi
 
