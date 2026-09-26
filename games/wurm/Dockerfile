@@ -1,4 +1,4 @@
-FROM        debian:bullseye-slim
+FROM        debian:bookworm-slim
 
 LABEL      org.opencontainers.image.authors="Torsten Widmann - gOOvER - info@goover.de"
 LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"
@@ -10,8 +10,9 @@ ARG         DEBIAN_FRONTEND=noninteractive
 RUN         dpkg --add-architecture i386 \
             && apt-get update \
             && apt-get upgrade -y \
-            && apt-get install -y --fix-missing \
+            && apt-get install -y --no-install-recommends \
                 apt-transport-https \
+                ca-certificates \
                 curl \
                 g++ \
                 gcc \
@@ -42,12 +43,9 @@ RUN         dpkg --add-architecture i386 \
                 libc6:i386 \
                 libcurl3-gnutls:i386 \
                 libcurl4 \
-                libcurl4 \
                 libcurl4-gnutls-dev:i386 \
                 libcurl4:i386 \
                 libfontconfig1 \
-                libfontconfig1 \
-                libgcc1 \
                 libgconf-2-4 \
                 libgdiplus \
                 libncurses5:i386 \
