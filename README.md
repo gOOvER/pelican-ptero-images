@@ -55,7 +55,6 @@ periodically to ensure dependencies are always up-to-date.
   - [Arch Linux](#archlinux-distro)
 - [Installer Images](#installer-images)
 - [Alpine Images](#alpine-images)
-- [Voice Images](#voice-images)
 - [Custom Images](#custom-images)
 
 ---
@@ -595,18 +594,6 @@ periodically to ensure dependencies are always up-to-date.
 | alpine:nodejs18 | `ghcr.io/goover/alpine:nodejs18` | ✅ | ✅ | Alpine + Node.js 18 |
 | alpine:nodejs20 | `ghcr.io/goover/alpine:nodejs20` | ✅ | ✅ | Alpine + Node.js 20 |
 | alpine:wine | `ghcr.io/goover/alpine:wine` | ✅ | ❌ | Alpine + Wine |
-
----
-
-# <a name="voice-images"></a>🎙️ Voice Images
-
-| Image | Status | Description |
-|-------|--------|-------------|
-| `goover/voice` | [![build voice](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/voice.yml/badge.svg)](https://github.com/gOOvER/pelican-ptero-images/actions/workflows/voice.yml) | Voice Server Images |
-
-| Image | URI | AMD64 | ARM64 | Description |
-|-------|:---:|:-----:|:-----:|-------------|
-| voice:teaspeak | `ghcr.io/goover/voice:teaspeak` | ✅ | ✅ | TeaSpeak Server |
 
 ---
 
