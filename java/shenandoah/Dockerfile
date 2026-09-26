@@ -7,12 +7,7 @@ LABEL   	org.opencontainers.image.licenses=MIT
 
 ENV         DEBIAN_FRONTEND=noninteractive
 
-RUN 		if grep -q 'bullseye' /etc/os-release 2>/dev/null; then \
-				sed -i 's|deb.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
-				sed -i 's|security.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
-				sed -i '/bullseye-updates/d' /etc/apt/sources.list; \
-			fi \
-			&& apt-get update \
+RUN 		apt-get update \
 			&& apt-get install -y --no-install-recommends \
 				ca-certificates \
 				curl \
