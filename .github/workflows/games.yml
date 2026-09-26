@@ -14,40 +14,60 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  push:
-    name: "games:${{ matrix.game }}"
-    runs-on: ubuntu-22.04
-    concurrency:
-      group: games-build-${{ github.ref }}-${{ matrix.game }}
-      cancel-in-progress: true
+  build:
+    name: "games:${{ matrix.game }} (${{ matrix.platform }})"
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        game:
-          - aloft
-          - aloft-proton
-          - arma3
-          - hytale
-          - interstellarrift
-          - mtsa
-          - quakeliveqlx
-          - screeps
-          - staxel
-          - thefront
-          - wurm
+        include:
+          - game: aloft
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - game: aloft-proton
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - game: arma3
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - game: interstellarrift
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - game: mtsa
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - game: quakeliveqlx
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - game: screeps
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - game: staxel
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - game: thefront
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - game: wurm
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - game: hytale
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - game: hytale
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/setup-qemu-action@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-        with:
-          version: latest
-          buildkitd-flags: --debug
-          cleanup: true
 
       - uses: docker/login-action@v4
         with:
@@ -55,25 +75,36 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute lowercase owner
-        id: owner
-        run: |
-          echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+      - name: Prepare platform tag
+        id: prep
+        run: echo "platform_tag=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_OUTPUT
 
-      - name: Build and push image (with build cache)
-        uses: docker/build-push-action@v7
-        id: build
+      - uses: docker/build-push-action@v7
         with:
           context: ./games/${{ matrix.game }}
           file: ./games/${{ matrix.game }}/Dockerfile
-          platforms: ${{ matrix.game == 'hytale' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          platforms: ${{ matrix.platform }}
           push: true
           network: host
-          tags: |
-            ghcr.io/${{ steps.owner.outputs.owner }}/games:${{ matrix.game }}
-            ghcr.io/${{ steps.owner.outputs.owner }}/games:${{ matrix.game }}-${{ github.sha }}
-          cache-from: type=gha,scope=games-${{ matrix.game }}
-          cache-to: type=gha,mode=max,scope=games-${{ matrix.game }}
-          # (progress option removed — not supported by this action version)
-        # Timeout safeguard for the step
-        timeout-minutes: 60
+          provenance: false
+          tags: ${{ matrix.game == 'hytale' && format('ghcr.io/goover/games:hytale-{0}', steps.prep.outputs.platform_tag) || format('ghcr.io/goover/games:{0}', matrix.game) }}
+          cache-from: type=gha,scope=games-${{ matrix.game }}-${{ steps.prep.outputs.platform_tag }}
+          cache-to: type=gha,mode=max,scope=games-${{ matrix.game }}-${{ steps.prep.outputs.platform_tag }}
+
+  merge:
+    name: "games:hytale (manifest)"
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/goover/games:hytale \
+            ghcr.io/goover/games:hytale-linux-amd64 \
+            ghcr.io/goover/games:hytale-linux-arm64

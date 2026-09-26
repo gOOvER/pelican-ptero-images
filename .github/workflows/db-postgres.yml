@@ -1,7 +1,6 @@
 name: build postgres
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * 1"
@@ -20,8 +19,64 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  push:
-    name: "postgres:${{ matrix.tag }}"
+  build:
+    name: "postgres:${{ matrix.tag }} (${{ matrix.platform }})"
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        tag:
+          - 11
+          - 12
+          - 13
+          - 14
+          - 15
+          - 16
+          - 17
+          - 18
+        platform:
+          - linux/amd64
+          - linux/arm64
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare platform tag
+        id: prep
+        run: echo "platform_tag=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./database/postgres
+          file: ./database/postgres/Dockerfile
+          build-args: |
+            POSTGRES_VERSION=${{ matrix.tag }}
+            POSTGRES_BASE=${{ (matrix.tag == 11 || matrix.tag == 12) && format('postgres:{0}-bookworm', matrix.tag) || format('postgres:{0}-trixie', matrix.tag) }}
+          platforms: ${{ matrix.platform }}
+          push: true
+          network: host
+          provenance: false
+          tags: ghcr.io/goover/postgres:${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          cache-from: type=gha,scope=postgres-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          cache-to: type=gha,mode=max,scope=postgres-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+
+  merge:
+    name: "postgres:${{ matrix.tag }} (manifest)"
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -35,38 +90,17 @@ jobs:
           - 16
           - 17
           - 18
-        include:
-          - tag: 11
-            base: postgres:11-bookworm
-          - tag: 12
-            base: postgres:12-bookworm
 
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/setup-qemu-action@v4
-
-      - uses: docker/setup-buildx-action@v4
-        with:
-          buildkitd-flags: --debug
-
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v7
-        with:
-          context: ./database/postgres
-          file: ./database/postgres/Dockerfile
-          build-args: |
-            POSTGRES_VERSION=${{ matrix.tag }}
-            POSTGRES_BASE=${{ matrix.base || format('postgres:{0}-trixie', matrix.tag) }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          network: host
-          tags: |
-            ghcr.io/goover/postgres:${{ matrix.tag }}
-          cache-from: type=gha,scope=postgres-${{ matrix.tag }}
-          cache-to: type=gha,mode=max,scope=postgres-${{ matrix.tag }}
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/goover/postgres:${{ matrix.tag }} \
+            ghcr.io/goover/postgres:${{ matrix.tag }}-linux-amd64 \
+            ghcr.io/goover/postgres:${{ matrix.tag }}-linux-arm64

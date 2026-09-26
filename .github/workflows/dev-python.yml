@@ -1,7 +1,6 @@
 name: build python
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * 1"
@@ -20,8 +19,63 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  push:
-    name: "python:${{ matrix.tag }}"
+  build:
+    name: "python:${{ matrix.tag }} (${{ matrix.platform }})"
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        tag:
+          - '3.7'
+          - '3.8'
+          - '3.9'
+          - '3.10'
+          - '3.11'
+          - '3.12'
+          - '3.13'
+          - '3.14'
+        platform:
+          - linux/amd64
+          - linux/arm64
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare platform tag
+        id: prep
+        run: echo "platform_tag=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./dev/python
+          file: ./dev/python/Dockerfile
+          build-args: |
+            PYTHON_VERSION=${{ matrix.tag }}
+          platforms: ${{ matrix.platform }}
+          push: true
+          network: host
+          provenance: false
+          tags: ghcr.io/goover/python:${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          cache-from: type=gha,scope=python-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          cache-to: type=gha,mode=max,scope=python-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+
+  merge:
+    name: "python:${{ matrix.tag }} (manifest)"
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -37,30 +91,15 @@ jobs:
           - '3.14'
 
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/setup-qemu-action@v4
-
-      - uses: docker/setup-buildx-action@v4
-        with:
-          buildkitd-flags: --debug
-
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v7
-        with:
-          context: ./dev/python
-          file: ./dev/python/Dockerfile
-          build-args: |
-            PYTHON_VERSION=${{ matrix.tag }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          network: host
-          tags: |
-            ghcr.io/goover/python:${{ matrix.tag }}
-          cache-from: type=gha,scope=python-${{ matrix.tag }}
-          cache-to: type=gha,mode=max,scope=python-${{ matrix.tag }}
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/goover/python:${{ matrix.tag }} \
+            ghcr.io/goover/python:${{ matrix.tag }}-linux-amd64 \
+            ghcr.io/goover/python:${{ matrix.tag }}-linux-arm64

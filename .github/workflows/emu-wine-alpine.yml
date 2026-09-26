@@ -1,7 +1,6 @@
 name: build alpine-emu-dev
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * 1"
@@ -20,8 +19,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  push:
-    name: "alpine:${{ matrix.oses }}"
+  build:
+    name: "alpine:${{ matrix.oses }} (${{ matrix.platform }})"
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        oses:
+          - nodejs18
+          - nodejs20
+          - wine
+        platform:
+          - linux/amd64
+          - linux/arm64
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare platform tag
+        id: prep
+        run: echo "platform_tag=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./alpine/${{ matrix.oses }}
+          file: ./alpine/${{ matrix.oses }}/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          network: host
+          provenance: false
+          tags: ghcr.io/goover/alpine:${{ matrix.oses }}-${{ steps.prep.outputs.platform_tag }}
+          cache-from: type=gha,scope=wine-alpine-${{ matrix.oses }}-${{ steps.prep.outputs.platform_tag }}
+          cache-to: type=gha,mode=max,scope=wine-alpine-${{ matrix.oses }}-${{ steps.prep.outputs.platform_tag }}
+
+  merge:
+    name: "alpine:${{ matrix.oses }} (manifest)"
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -32,28 +79,15 @@ jobs:
           - wine
 
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/setup-qemu-action@v4
-
-      - uses: docker/setup-buildx-action@v4
-        with:
-          buildkitd-flags: --debug
-
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v7
-        with:
-          context: ./alpine/${{ matrix.oses }}
-          file: ./alpine/${{ matrix.oses }}/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          network: host
-          tags: |
-            ghcr.io/goover/alpine:${{ matrix.oses }}
-          cache-from: type=gha,scope=wine-alpine-${{ matrix.oses }}
-          cache-to: type=gha,mode=max,scope=wine-alpine-${{ matrix.oses }}
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/goover/alpine:${{ matrix.oses }} \
+            ghcr.io/goover/alpine:${{ matrix.oses }}-linux-amd64 \
+            ghcr.io/goover/alpine:${{ matrix.oses }}-linux-arm64
