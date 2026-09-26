@@ -7,7 +7,11 @@ LABEL   	org.opencontainers.image.licenses=MIT
 
 ENV         DEBIAN_FRONTEND=noninteractive
 
-RUN 		apt-get update \
+RUN 		if grep -q 'bullseye' /etc/os-release 2>/dev/null; then \
+				echo "deb [check-valid-until=no] http://archive.debian.org/debian bullseye main" > /etc/apt/sources.list && \
+				rm -rf /var/lib/apt/lists/*; \
+			fi \
+			&& apt-get update \
 			&& apt-get install -y --no-install-recommends \
 				ca-certificates \
 				curl \
