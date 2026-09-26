@@ -11,7 +11,6 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Install required system packages and clean up afterwards to reduce image size
 RUN apt-get update && apt-get -y upgrade && \
     apt-get install -y --no-install-recommends \
-        nala \
         autoconf \
         automake \
         build-essential \
@@ -36,16 +35,17 @@ RUN apt-get update && apt-get -y upgrade && \
         libsqlite3-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Update npm, install TypeScript, ts-node, and package managers
+# Install TypeScript, ts-node, and package managers
 RUN NODE_MAJOR=$(node -v | cut -d'.' -f1 | tr -d 'v') && \
     if [ "$NODE_MAJOR" -ge 18 ]; then \
-        npm install -g npm@latest typescript ts-node tsx && \
-        corepack enable && \
-        corepack prepare pnpm@latest --activate && \
-        corepack prepare yarn@stable --activate; \
+        npm install -g typescript ts-node tsx && \
+        (command -v corepack >/dev/null 2>&1 || npm install -g corepack 2>/dev/null || true) && \
+        (corepack enable 2>/dev/null || true) && \
+        (corepack prepare pnpm@latest --activate 2>/dev/null || npm install -g pnpm 2>/dev/null || true) && \
+        (corepack prepare yarn@stable --activate 2>/dev/null || npm install -g yarn 2>/dev/null || true); \
     else \
-        npm install -g npm@next-9 typescript ts-node @types/node && \
-        npm install -g corepack 2>/dev/null || true; \
+        npm install -g typescript ts-node @types/node && \
+        (command -v corepack >/dev/null 2>&1 || npm install -g corepack 2>/dev/null || true); \
     fi
 
 # Generate and set en_US.UTF-8 locale

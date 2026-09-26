@@ -3,7 +3,7 @@ FROM        --platform=$TARGETOS/$TARGETARCH alpine:latest
 LABEL       org.opencontainers.image.authors="info@goover.de"
 LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"
 LABEL       org.opencontainers.image.licenses=AGPL-3.0-or-later
-LABEL       org.opencontainers.image.description="Docker image for Pelican Hosting Panel and Pterodactyl"LABEL       org.opencontainers.image.description Dockerimage for Pelican Hosting Panel and Pterodactyl
+LABEL       org.opencontainers.image.description="Docker image for Pelican Hosting Panel and Pterodactyl"
 
 # Install wine and wget
 RUN         apk update

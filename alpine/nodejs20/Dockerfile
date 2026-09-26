@@ -30,8 +30,6 @@ RUN         apk add --no-cache \
                 zip \
                 libc6-compat
 
-# updating npm
-RUN         npm install npm@latest -g
 RUN         npm install -g typescript ts-node
 
 ## Setup user and working directory
