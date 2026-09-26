@@ -11,6 +11,7 @@ ARG         DEBIAN_FRONTEND=noninteractive
 RUN         dpkg --add-architecture i386
 RUN 		apt-get update \
 			&& apt-get upgrade -y \
+			&& apt-get install -y --no-install-recommends curl tar ca-certificates locales \
 			&& apt-get clean \
 			&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -18,14 +19,15 @@ RUN 		apt-get update \
 RUN         cd /tmp/ \
             && curl -sSL https://github.com/gorcon/rcon-cli/releases/download/v0.10.3/rcon-0.10.3-amd64_linux.tar.gz > rcon.tar.gz \
             && tar xvf rcon.tar.gz \
-            && mv rcon-0.10.3-amd64_linux/rcon /usr/local/bin/
+            && mv rcon-0.10.3-amd64_linux/rcon /usr/local/bin/ \
+            && rm -rf /tmp/rcon*
 
 # Set the locale
 RUN         sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
             locale-gen
-ENV         LANG en_US.UTF-8
-ENV         LANGUAGE en_US:en
-ENV         LC_ALL en_US.UTF-8
+ENV         LANG=en_US.UTF-8
+ENV         LANGUAGE=en_US:en
+ENV         LC_ALL=en_US.UTF-8
 
 ## Prepare NSS Wrapper for the entrypoint as a workaround for games requiring a valid UID
 RUN         touch /tmp/passwd /tmp/group \
