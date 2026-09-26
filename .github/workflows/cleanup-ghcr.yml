@@ -10,12 +10,17 @@ permissions:
   packages: write
   contents: read
 
+concurrency:
+  group: cleanup-ghcr
+  cancel-in-progress: true
+
 jobs:
   cleanup:
     name: "cleanup:${{ matrix.package }}"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         package:
           - java

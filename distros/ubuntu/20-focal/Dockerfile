@@ -5,7 +5,7 @@ LABEL       	org.opencontainers.image.source="https://github.com/gOOvER/pelican-
 LABEL       	org.opencontainers.image.description="Docker image for Pelican, Jexactyl & Pterodactyl"
 LABEL       	org.opencontainers.image.licenses=AGPL-3.0-or-later
 
-ARG             DEBIAN_FRONTEND noninteractive
+ENV             DEBIAN_FRONTEND=noninteractive
 
 ## update base packages
 RUN             apt update \
