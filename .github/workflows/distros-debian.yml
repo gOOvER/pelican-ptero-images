@@ -27,7 +27,6 @@ jobs:
       fail-fast: false
       matrix:
         oses:
-          - '11-bullseye'
           - '12-bookworm'
           - '13-trixie'
 

@@ -27,8 +27,6 @@ jobs:
       fail-fast: false
       matrix:
         tag:
-          - 12
-          - 14
           - 16
           - 18
           - 20
@@ -37,10 +35,6 @@ jobs:
           - 25
           - 26
         include:
-          - tag: 12
-            base: node:12-bullseye-slim
-          - tag: 14
-            base: node:14-bullseye-slim
           - tag: 16
             base: node:16-bookworm-slim
           - tag: 18
