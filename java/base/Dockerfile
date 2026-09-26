@@ -1,5 +1,6 @@
 ARG         JAVA_VERSION=21
-FROM        --platform=$TARGETOS/$TARGETARCH eclipse-temurin:${JAVA_VERSION}-jdk-noble
+ARG         JAVA_BASE=eclipse-temurin:${JAVA_VERSION}-jdk
+FROM        --platform=$TARGETOS/$TARGETARCH ${JAVA_BASE}
 
 LABEL       org.opencontainers.image.authors="info@goover.de"
 LABEL       org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"
@@ -14,7 +15,6 @@ RUN 		apt-get update \
 				ca-certificates \
 				curl \
 				ffmpeg \
-				font-manager \
 				fontconfig \
 				git \
 				iproute2 \

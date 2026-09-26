@@ -48,6 +48,9 @@ jobs:
             runner: ubuntu-latest
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
+        exclude:
+          - tag: 13
+            platform: linux/arm64
 
     steps:
       - uses: actions/checkout@v7
@@ -109,8 +112,16 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and push multi-arch manifest
+        if: ${{ matrix.tag != 13 }}
         run: |
           docker buildx imagetools create \
             --tag ghcr.io/goover/java:zulu_${{ matrix.tag }} \
             ghcr.io/goover/java:zulu_${{ matrix.tag }}-linux-amd64 \
             ghcr.io/goover/java:zulu_${{ matrix.tag }}-linux-arm64
+
+      - name: Create and push amd64-only manifest (13)
+        if: ${{ matrix.tag == 13 }}
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/goover/java:zulu_${{ matrix.tag }} \
+            ghcr.io/goover/java:zulu_${{ matrix.tag }}-linux-amd64
