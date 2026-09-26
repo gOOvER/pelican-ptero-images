@@ -37,6 +37,25 @@ export INTERNAL_IP
 
 cd /home/container || exit 1
 
+# ----------------------------
+# System Info
+# ----------------------------
+LINUX=$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || echo "Linux")
+TIMEZONE=$(if [ -f /etc/timezone ]; then cat /etc/timezone; elif [ -L /etc/localtime ]; then readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||'; else echo "${TZ:-UTC}"; fi)
+
+# ----------------------------
+# Banner
+# ----------------------------
+clear
+line BLUE
+msg RED "Hytale Image by gOOvER - https://dsc.gg/goover"
+msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
+line BLUE
+msg YELLOW "System Information:"
+msg YELLOW "  • Linux Distribution: ${RED}$LINUX"
+msg YELLOW "  • Current timezone:   ${RED}$TIMEZONE"
+line BLUE
+
 rm -rf /home/container/.tmp
 mkdir -p /home/container/.tmp
 DOWNLOADER_URL="https://downloader.hytale.com/hytale-downloader.zip"

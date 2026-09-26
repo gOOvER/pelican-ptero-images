@@ -57,12 +57,13 @@ KERNEL_INFO=$(uname -srm 2>/dev/null || uname -r 2>/dev/null || echo 'unknown')
 # ----------------------------
 clear
 line BLUE
-msg YELLOW "SteamCMD Image from gOOvER"
+msg RED "SteamCMD Image by gOOvER - https://dsc.gg/goover"
 msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
-msg YELLOW "Docker Linux Distribution: ${RED}$LINUX"
-msg YELLOW "Kernel: ${RED}$KERNEL_INFO"
-msg YELLOW "Current timezone: ${RED}$TIMEZONE"
+msg YELLOW "System Information:"
+msg YELLOW "  • Linux Distribution: ${RED}$LINUX"
+msg YELLOW "  • Kernel:             ${RED}$KERNEL_INFO"
+msg YELLOW "  • Current timezone:   ${RED}$TIMEZONE"
 line BLUE
 
 # ----------------------------

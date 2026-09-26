@@ -1,46 +1,119 @@
 #!/bin/bash
-#Variables
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
 
+# ----------------------------
+# Colors via tput (with fallback to basic ANSI)
+# ----------------------------
+if tput setaf 1 >/dev/null 2>&1; then
+    RED=$(tput setaf 1)
+    GREEN=$(tput setaf 2)
+    YELLOW=$(tput setaf 3)
+    BLUE=$(tput setaf 4)
+    CYAN=$(tput setaf 6)
+    NC=$(tput sgr0)
+else
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    CYAN='\033[0;36m'
+    NC='\033[0m'
+fi
+
+# ----------------------------
+# Functions
+# ----------------------------
+msg() {
+    local color="$1"
+    shift
+    local c
+    case "$color" in
+        RED) c="$RED";;
+        GREEN) c="$GREEN";;
+        YELLOW) c="$YELLOW";;
+        BLUE) c="$BLUE";;
+        CYAN) c="$CYAN";;
+        *) c="$NC";;
+    esac
+    printf "%b\n" "${c}$*${NC}"
+}
+
+line() {
+    local color="${1:-BLUE}"
+    local term_width
+    term_width=$(tput cols 2>/dev/null || echo 70)
+    [ "$term_width" -gt 100 ] && term_width=100
+    [ "$term_width" -lt 40 ] && term_width=70
+    local sep
+    sep=$(printf '%*s' "$term_width" '' | tr ' ' '-')
+    local c
+    case "$color" in
+        RED) c="$RED";;
+        GREEN) c="$GREEN";;
+        YELLOW) c="$YELLOW";;
+        BLUE) c="$BLUE";;
+        CYAN) c="$CYAN";;
+        *) c="$NC";;
+    esac
+    printf "%b\n" "${c}${sep}${NC}"
+}
+
+# ----------------------------
+# System Info
+# ----------------------------
+LINUX=$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || echo "Linux")
+TIMEZONE=$(if [ -f /etc/timezone ]; then cat /etc/timezone; elif [ -L /etc/localtime ]; then readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||'; else echo "${TZ:-UTC}"; fi)
+MONGO_VER=$(if command -v mongod >/dev/null 2>&1; then mongod --version | head -n 1; else echo "MongoDB not found"; fi)
+REDIS_VER=$(if command -v redis-server >/dev/null 2>&1; then redis-server --version | head -n 1; else echo "Redis not found"; fi)
+NODE_VER=$(if command -v node >/dev/null 2>&1; then node -v; else echo "NodeJS not found"; fi)
+NPM_VER=$(if command -v npm >/dev/null 2>&1; then npm -v; else echo "NPM not found"; fi)
+
+# ----------------------------
+# Banner
+# ----------------------------
 clear
+line BLUE
+msg RED "Screeps Image by gOOvER - https://dsc.gg/goover"
+msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
+line BLUE
+msg YELLOW "System Information:"
+msg YELLOW "  • Linux Distribution: ${RED}$LINUX"
+msg YELLOW "  • Current timezone:   ${RED}$TIMEZONE"
+msg YELLOW "  • MongoDB Version: ${RED}${MONGO_VER}"
+msg YELLOW "  • Redis Version: ${RED}${REDIS_VER}"
+msg YELLOW "  • NodeJS Version: ${RED}${NODE_VER}"
+msg YELLOW "  • NPM Version: ${RED}${NPM_VER}"
+line BLUE
 
-#show versions
-echo -e "${BLUE}---------------------------------------------------------------------${NC}"
-echo -e "${YELLOW}Screeps Installation${NC}"
-echo -e "${BLUE}---------------------------------------------------------------------${NC}"
-echo -e "${YELLOW}MongoDB Version:${NC} " && mongod --version
-echo -e "${YELLOW}Redis Version:${NC} " && redis-server --version
-echo -e "${YELLOW}NodeJS Version:${NC} " && node -v
-echo -e "${YELLOW}NPM Version:${NC} " && npm -v
-#echo -e "${YELLOW}Java Version:${NC} " && java -version
-echo -e "${YELLOW}Linux Distribution: ${RED} $(. /etc/os-release ; echo $PRETTY_NAME)${NC}"
-echo -e "${YELLOW}Current timezone:${NC} " && ([ -f /etc/timezone ] && cat /etc/timezone || echo "${TZ:-UTC}")
-echo -e "${BLUE}---------------------------------------------------------------------${NC}"
+# ----------------------------
+# Environment
+# ----------------------------
+cd /home/container || exit 1
 
-cd /home/container
+# Wait for the container to fully initialize
+sleep 1
+
+# Default the TZ environment variable to UTC
+export TZ="${TZ:-UTC}"
 
 # Set environment variable that holds the Internal Docker IP
 INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || echo "127.0.0.1")
 export INTERNAL_IP
 
-# Replace Startup Variables
+# ----------------------------
+# Startup
+# ----------------------------
 MODIFIED_STARTUP=$(echo -e "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
-echo -e "${YELLOW}:/home/container${NC} ${MODIFIED_STARTUP}"
 
 # start mongo
-echo -e "${BLUE}---------------------------------------------------------------------${NC}"
-echo -e "${YELLOW}starting MongoDB...${NC}"
-echo -e "${BLUE}---------------------------------------------------------------------${NC}"
+line BLUE
+msg YELLOW "Starting MongoDB..."
+line BLUE
 mongod --fork --dbpath /home/container/mongodb/ --port 27017 --logpath /home/container/mongod.log --logRotate reopen --logappend && until nc -z -v -w5 127.0.0.1 27017; do echo 'Waiting for mongodb connection...'; sleep 5; done
 
 # Run the Server
-echo -e "${BLUE}---------------------------------------------------------------------${NC}"
-echo -e "${YELLOW}starting Screeps Server${NC}"
-echo -e "${BLUE}---------------------------------------------------------------------${NC}"
+line BLUE
+msg YELLOW "Starting Screeps Server..."
+line BLUE
+msg CYAN ":/home/container$ ${MODIFIED_STARTUP}"
 trap "mongod --shutdown" EXIT INT TERM
 exec bash -c "${MODIFIED_STARTUP}"
-

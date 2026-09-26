@@ -62,11 +62,13 @@ INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}' 2>/dev/null || echo "1
 export INTERNAL_IP
 
 line BLUE
-msg RED "SteamCMD Image by gOOvER - https://dsc.gg/goover"
+msg RED "Quake Live QLX Image by gOOvER - https://dsc.gg/goover"
+msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
-msg YELLOW "Linux Distribution: ${RED}$(. /etc/os-release ; echo $PRETTY_NAME)"
-msg YELLOW "Current timezone: ${RED}$(cat /etc/timezone 2>/dev/null || echo $TZ)"
-msg YELLOW "Python Version: ${RED}$(python3 --version 2>&1)"
+msg YELLOW "System Information:"
+msg YELLOW "  • Linux Distribution: ${RED}$(. /etc/os-release ; echo $PRETTY_NAME)"
+msg YELLOW "  • Current timezone:   ${RED}$([ -f /etc/timezone ] && cat /etc/timezone || echo "${TZ:-UTC}")"
+msg YELLOW "  • Python Version:     ${RED}$(python3 --version 2>&1 | head -n 1)"
 line BLUE
 
 cd /home/container || { msg RED "Failed to change directory to /home/container."; exit 1; }

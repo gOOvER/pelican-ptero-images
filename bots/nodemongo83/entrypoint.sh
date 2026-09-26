@@ -87,15 +87,15 @@ export INTERNAL_IP
 clear
 line BLUE
 msg RED "NodeJS & MongoDB Image by gOOvER - https://dsc.gg/goover"
-msg RED "This Image is licencend under AGPLv3"
+msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
-msg YELLOW "Running on: ${RED}$(. /etc/os-release ; echo $NAME $VERSION)"
-msg YELLOW "Current timezone: ${RED}$([ -f /etc/timezone ] && cat /etc/timezone || echo "${TZ:-UTC}")"
-line BLUE
-msg YELLOW "NodeJS Version: ${RED}$(node -v)"
-msg YELLOW "BUN Version: ${RED}$(bun --version)"
-msg YELLOW "npm Version: ${RED}$(npm -v)"
-msg YELLOW "MongoDB Version: ${RED}$(mongod --version | head -n 1)"
+msg YELLOW "System Information:"
+msg YELLOW "  • Linux Distribution: ${RED}$(. /etc/os-release ; echo $PRETTY_NAME)"
+msg YELLOW "  • Current timezone:   ${RED}$([ -f /etc/timezone ] && cat /etc/timezone || echo "${TZ:-UTC}")"
+msg YELLOW "  • NodeJS Version:     ${RED}$(node -v 2>/dev/null || echo 'Unknown')"
+msg YELLOW "  • BUN Version:        ${RED}$(bun --version 2>/dev/null || echo 'Unknown')"
+msg YELLOW "  • NPM Version:        ${RED}$(npm -v 2>/dev/null || echo 'Unknown')"
+msg YELLOW "  • MongoDB Version:    ${RED}$(mongod --version 2>/dev/null | head -n 1 || echo 'Unknown')"
 line BLUE
 
 # ----------------------------
