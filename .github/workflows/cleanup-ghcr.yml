@@ -42,11 +42,42 @@ jobs:
 
     steps:
       - name: Prune untagged versions for ${{ matrix.package }}
-        uses: actions/delete-package-versions@v5
         continue-on-error: true
-        with:
-          owner: ${{ github.repository_owner }}
-          package-type: 'container'
-          package-name: ${{ matrix.package }}
-          delete-only-untagged-versions: 'true'
-          min-versions-to-keep: 0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          echo "🔍 Fetching untagged versions for package: $PACKAGE (owner: $OWNER)..."
+          
+          # Fetch versions from user or org endpoint
+          VERSIONS=$(gh api --paginate "/user/packages/container/${PACKAGE}/versions?per_page=100" 2>/dev/null || \
+                     gh api --paginate "/users/${OWNER}/packages/container/${PACKAGE}/versions?per_page=100" 2>/dev/null || \
+                     gh api --paginate "/orgs/${OWNER}/packages/container/${PACKAGE}/versions?per_page=100" 2>/dev/null || true)
+          
+          if [ -z "$VERSIONS" ]; then
+            echo "ℹ️ No package or versions found for $PACKAGE."
+            exit 0
+          fi
+
+          # Extract IDs where metadata.container.tags is empty or length == 0
+          UNTAGGED_IDS=$(echo "$VERSIONS" | jq -r '.[] | select((.metadata.container.tags // []) | length == 0) | .id' 2>/dev/null || true)
+
+          if [ -z "$UNTAGGED_IDS" ]; then
+            echo "✅ No untagged versions found for $PACKAGE."
+            exit 0
+          fi
+
+          DELETED=0
+          for ID in $UNTAGGED_IDS; do
+            echo "🗑️ Deleting untagged version ID: $ID..."
+            if gh api -X DELETE "/user/packages/container/${PACKAGE}/versions/${ID}" 2>/dev/null || \
+               gh api -X DELETE "/users/${OWNER}/packages/container/${PACKAGE}/versions/${ID}" 2>/dev/null || \
+               gh api -X DELETE "/orgs/${OWNER}/packages/container/${PACKAGE}/versions/${ID}" 2>/dev/null; then
+              DELETED=$((DELETED + 1))
+            else
+              echo "⚠️ Failed to delete version $ID (may have dependencies or insufficient permissions)"
+            fi
+          done
+
+          echo "🎉 Successfully deleted $DELETED untagged versions for $PACKAGE."
