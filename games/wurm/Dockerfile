@@ -11,7 +11,6 @@ RUN         dpkg --add-architecture i386
 RUN         apt update
 RUN         apt upgrade -y
 RUN         apt install -y \
-                nala \
                 apt-transport-https \
                 curl \
                 g++ \

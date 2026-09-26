@@ -62,14 +62,12 @@ RUN set -eux; cd /tmp; \
     curl_args=(-sSf); \
     [ -n "${GITHUB_TOKEN:-}" ] && curl_args+=(-H "Authorization: Bearer ${GITHUB_TOKEN}"); \
     PROTON_JSON=$(curl "${curl_args[@]}" https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest 2>&1) || { echo "Failed to fetch Proton-GE releases" >&2; exit 1; }; \
-    # Extract x86_64 .tar.gz URL - match only bare "GE-ProtonXX-Y.tar.gz" (no arch suffix)
-    # GE-Proton11-1 introduced separate aarch64 builds; without this filter
-    # head -n1 would grab the aarch64 tarball first (it appears earlier in the API response)
-    # causing ENOEXEC at runtime when x86_64 tries to execute ARM64 wine binaries.
-    PROTON_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[] | select(.name | test("^GE-Proton[0-9]+-[0-9]+\\.tar\\.gz$")) | .browser_download_url' 2>/dev/null | head -n1) || { echo "Failed to parse Proton-GE release JSON" >&2; exit 1; }; \
+    # Extract x86_64 .tar.gz URL - match "GE-ProtonXX-Y.tar.gz" or "GE-ProtonXX-Y-x86_64.tar.gz" (ignore aarch64)
+    # GE-Proton11-1 introduced separate aarch64 builds and GE-Proton11-7 added explicit -x86_64 suffix
+    PROTON_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[] | select(.name | test("^GE-Proton[0-9]+-[0-9]+(-x86_64)?\\.tar\\.gz$")) | .browser_download_url' 2>/dev/null | head -n1) || { echo "Failed to parse Proton-GE release JSON" >&2; exit 1; }; \
     [ -n "$PROTON_URL" ] || { echo "No Proton-GE x86_64 .tar.gz found in latest release" >&2; exit 1; }; \
-    # Extract matching checksum URL (same name pattern without arch suffix)
-    PROTON_CHECKSUM_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[] | select(.name | test("^GE-Proton[0-9]+-[0-9]+\\.sha512sum$")) | .browser_download_url' 2>/dev/null | head -n1) || true; \
+    # Extract matching checksum URL
+    PROTON_CHECKSUM_URL=$(printf '%s' "$PROTON_JSON" | jq -r '.assets[] | select(.name | test("^GE-Proton[0-9]+-[0-9]+(-x86_64)?\\.sha512sum$")) | .browser_download_url' 2>/dev/null | head -n1) || true; \
     # Download Proton-GE tarball
     curl -sSL "$PROTON_URL" -o proton-ge.tar.gz || { echo "Failed to download Proton-GE from $PROTON_URL" >&2; exit 1; }; \
     [ -s proton-ge.tar.gz ] || { echo "Downloaded Proton-GE archive is empty" >&2; exit 1; }; \
