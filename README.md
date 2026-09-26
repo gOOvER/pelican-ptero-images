@@ -211,18 +211,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| java:8 | `ghcr.io/goover/java:8` | ✅ | ✅ |
-| java:11 | `ghcr.io/goover/java:11` | ✅ | ✅ |
-| java:16 | `ghcr.io/goover/java:16` | ✅ | ✅ |
-| java:17 | `ghcr.io/goover/java:17` | ✅ | ✅ |
-| java:18 | `ghcr.io/goover/java:18` | ✅ | ✅ |
-| java:19 | `ghcr.io/goover/java:19` | ✅ | ✅ |
-| java:20 | `ghcr.io/goover/java:20` | ✅ | ✅ |
-| java:21 | `ghcr.io/goover/java:21` | ✅ | ✅ |
-| java:22 | `ghcr.io/goover/java:22` | ✅ | ✅ |
-| java:23 | `ghcr.io/goover/java:23` | ✅ | ✅ |
-| java:24 | `ghcr.io/goover/java:24` | ✅ | ✅ |
-| java:25 | `ghcr.io/goover/java:25` | ✅ | ✅ |
 
 ---
 
@@ -234,12 +222,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| java:graalvm_17 | `ghcr.io/goover/java:graalvm_17` | ✅ | ✅ |
-| java:graalvm_20 | `ghcr.io/goover/java:graalvm_20` | ✅ | ✅ |
-| java:graalvm_21 | `ghcr.io/goover/java:graalvm_21` | ✅ | ✅ |
-| java:graalvm_22 | `ghcr.io/goover/java:graalvm_22` | ✅ | ✅ |
-| java:graalvm_23 | `ghcr.io/goover/java:graalvm_23` | ✅ | ✅ |
-| java:graalvm_25 | `ghcr.io/goover/java:graalvm_25` | ✅ | ✅ |
 
 ---
 
@@ -251,13 +233,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| java:corretto_8 | `ghcr.io/goover/java:corretto_8` | ✅ | ✅ |
-| java:corretto_11 | `ghcr.io/goover/java:corretto_11` | ✅ | ✅ |
-| java:corretto_17 | `ghcr.io/goover/java:corretto_17` | ✅ | ✅ |
-| java:corretto_21 | `ghcr.io/goover/java:corretto_21` | ✅ | ✅ |
-| java:corretto_23 | `ghcr.io/goover/java:corretto_23` | ✅ | ✅ |
-| java:corretto_24 | `ghcr.io/goover/java:corretto_24` | ✅ | ✅ |
-| java:corretto_25 | `ghcr.io/goover/java:corretto_25` | ✅ | ✅ |
 
 ---
 
@@ -269,19 +244,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| java:zulu_8 | `ghcr.io/goover/java:zulu_8` | ✅ | ✅ |
-| java:zulu_11 | `ghcr.io/goover/java:zulu_11` | ✅ | ✅ |
-| java:zulu_13 | `ghcr.io/goover/java:zulu_13` | ✅ | ✅ |
-| java:zulu_15 | `ghcr.io/goover/java:zulu_15` | ✅ | ✅ |
-| java:zulu_17 | `ghcr.io/goover/java:zulu_17` | ✅ | ✅ |
-| java:zulu_18 | `ghcr.io/goover/java:zulu_18` | ✅ | ✅ |
-| java:zulu_19 | `ghcr.io/goover/java:zulu_19` | ✅ | ✅ |
-| java:zulu_20 | `ghcr.io/goover/java:zulu_20` | ✅ | ✅ |
-| java:zulu_21 | `ghcr.io/goover/java:zulu_21` | ✅ | ✅ |
-| java:zulu_22 | `ghcr.io/goover/java:zulu_22` | ✅ | ✅ |
-| java:zulu_23 | `ghcr.io/goover/java:zulu_23` | ✅ | ✅ |
-| java:zulu_24 | `ghcr.io/goover/java:zulu_24` | ✅ | ✅ |
-| java:zulu_25 | `ghcr.io/goover/java:zulu_25` | ✅ | ✅ |
 
 ---
 
@@ -293,10 +255,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| java:dragonwell_8 | `ghcr.io/goover/java:dragonwell_8` | ✅ | ✅ |
-| java:dragonwell_11 | `ghcr.io/goover/java:dragonwell_11` | ✅ | ✅ |
-| java:dragonwell_17 | `ghcr.io/goover/java:dragonwell_17` | ✅ | ✅ |
-| java:dragonwell_21 | `ghcr.io/goover/java:dragonwell_21` | ✅ | ✅ |
 
 ---
 
@@ -308,13 +266,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| java:liberica_8 | `ghcr.io/goover/java:liberica_8` | ✅ | ✅ |
-| java:liberica_11 | `ghcr.io/goover/java:liberica_11` | ✅ | ✅ |
-| java:liberica_17 | `ghcr.io/goover/java:liberica_17` | ✅ | ✅ |
-| java:liberica_21 | `ghcr.io/goover/java:liberica_21` | ✅ | ✅ |
-| java:liberica_23 | `ghcr.io/goover/java:liberica_23` | ✅ | ✅ |
-| java:liberica_24 | `ghcr.io/goover/java:liberica_24` | ✅ | ✅ |
-| java:liberica_25 | `ghcr.io/goover/java:liberica_25` | ✅ | ✅ |
 
 ---
 
@@ -326,11 +277,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| java:shenandoah_8 | `ghcr.io/goover/java:shenandoah_8` | ✅ | ❌ |
-| java:shenandoah_11 | `ghcr.io/goover/java:shenandoah_11` | ✅ | ❌ |
-| java:shenandoah_17 | `ghcr.io/goover/java:shenandoah_17` | ✅ | ✅ |
-| java:shenandoah_21 | `ghcr.io/goover/java:shenandoah_21` | ✅ | ✅ |
-| java:shenandoah_25 | `ghcr.io/goover/java:shenandoah_25` | ✅ | ✅ |
 
 ---
 
@@ -344,12 +290,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| mariadb:latest | `ghcr.io/goover/mariadb:latest` | ✅ | ✅ |
-| mariadb:lts | `ghcr.io/goover/mariadb:lts` | ✅ | ✅ |
-| mariadb:10 | `ghcr.io/goover/mariadb:10` | ✅ | ✅ |
-| mariadb:11 | `ghcr.io/goover/mariadb:11` | ✅ | ✅ |
-| mariadb:12 | `ghcr.io/goover/mariadb:12` | ✅ | ✅ |
-| mariadb:13 | `ghcr.io/goover/mariadb:13` | ✅ | ✅ |
 
 ---
 
@@ -361,14 +301,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| postgres:11 | `ghcr.io/goover/postgres:11` | ✅ | ✅ |
-| postgres:12 | `ghcr.io/goover/postgres:12` | ✅ | ✅ |
-| postgres:13 | `ghcr.io/goover/postgres:13` | ✅ | ✅ |
-| postgres:14 | `ghcr.io/goover/postgres:14` | ✅ | ✅ |
-| postgres:15 | `ghcr.io/goover/postgres:15` | ✅ | ✅ |
-| postgres:16 | `ghcr.io/goover/postgres:16` | ✅ | ✅ |
-| postgres:17 | `ghcr.io/goover/postgres:17` | ✅ | ✅ |
-| postgres:18 | `ghcr.io/goover/postgres:18` | ✅ | ✅ |
 
 ---
 
@@ -380,9 +312,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| mongodb:5 | `ghcr.io/goover/mongodb:5` | ✅ | ✅ |
-| mongodb:6 | `ghcr.io/goover/mongodb:6` | ✅ | ✅ |
-| mongodb:7 | `ghcr.io/goover/mongodb:7` | ✅ | ✅ |
 
 ---
 
@@ -394,9 +323,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| redis:6 | `ghcr.io/goover/redis:6` | ✅ | ✅ |
-| redis:7 | `ghcr.io/goover/redis:7` | ✅ | ✅ |
-| redis:8 | `ghcr.io/goover/redis:8` | ✅ | ✅ |
 
 ---
 
