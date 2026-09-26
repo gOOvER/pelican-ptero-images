@@ -10,7 +10,6 @@ ARG         DEBIAN_FRONTEND=noninteractive
 RUN 		apt-get update \
 			&& apt-get upgrade -y \
 			&& apt-get install -y --no-install-recommends \
-                nala \
                 apt-transport-https \
                 apt-utils \
                 ca-certificates \
@@ -36,7 +35,6 @@ RUN         wget -O- -q https://apt.corretto.aws/corretto.key | apt-key add - \
 			&& add-apt-repository 'deb https://apt.corretto.aws stable main' \
 			&& apt-get update \
 			&& apt-get install -y --no-install-recommends java-${JAVA_VERSION}-amazon-corretto-jdk \
-			nala \
 			&& apt-get clean \
 			&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
