@@ -55,5 +55,5 @@ jobs:
           network: host
           tags: |
             ghcr.io/goover/keydb:${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=keydb-${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=keydb-${{ matrix.tag }}

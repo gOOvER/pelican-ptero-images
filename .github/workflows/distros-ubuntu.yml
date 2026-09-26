@@ -27,8 +27,6 @@ jobs:
       fail-fast: false
       matrix:
         oses:
-          - '18-bionic'
-          - '20-focal'
           - '22-jammy'
           - '24-noble'
           - '26-resolute'
@@ -77,8 +75,6 @@ jobs:
       fail-fast: false
       matrix:
         oses:
-          - '18-bionic'
-          - '20-focal'
           - '22-jammy'
           - '24-noble'
           - '26-resolute'

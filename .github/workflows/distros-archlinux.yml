@@ -54,5 +54,5 @@ jobs:
           network: host
           tags: |
             ghcr.io/goover/archlinux:${{ matrix.oses }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=archlinux-${{ matrix.oses }}
+          cache-to: type=gha,mode=max,scope=archlinux-${{ matrix.oses }}

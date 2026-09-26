@@ -55,5 +55,5 @@ jobs:
           network: host
           tags: |
             ghcr.io/goover/alpine:${{ matrix.oses }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=wine-alpine-${{ matrix.oses }}
+          cache-to: type=gha,mode=max,scope=wine-alpine-${{ matrix.oses }}

@@ -64,5 +64,5 @@ jobs:
           network: host
           tags: |
             ghcr.io/goover/go:${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=go-${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=go-${{ matrix.tag }}

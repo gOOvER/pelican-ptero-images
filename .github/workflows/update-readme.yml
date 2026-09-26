@@ -240,6 +240,15 @@ jobs:
             fi
           done
 
+          # Remove deleted custom images
+          for c in $(grep -oP 'custom:\K[a-z0-9-]+(?= \|)' README.md | sort -u); do
+            if ! dir_exists "custom/$c"; then
+              echo "  ➖ Removing custom:$c (no longer exists)"
+              sed -i "/| custom:$c /d" README.md
+              CHANGES_MADE="${CHANGES_MADE}Removed Custom: $c\n"
+            fi
+          done
+
           # ============================================
           # ADD NEW IMAGES
           # ============================================

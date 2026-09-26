@@ -549,8 +549,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| ubuntu:18-bionic | `ghcr.io/goover/ubuntu:18-bionic` | ✅ | ✅ |
-| ubuntu:20-focal | `ghcr.io/goover/ubuntu:20-focal` | ✅ | ✅ |
 | ubuntu:22-jammy | `ghcr.io/goover/ubuntu:22-jammy` | ✅ | ✅ |
 | ubuntu:24-noble | `ghcr.io/goover/ubuntu:24-noble` | ✅ | ✅ |
 | ubuntu:26-resolute | `ghcr.io/goover/ubuntu:26-resolute` | ✅ | ✅ |
@@ -621,7 +619,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 | Description |
 |-------|:---:|:-----:|:-----:|-------------|
-| custom:node16132 | `ghcr.io/goover/custom:node16132` | ✅ | ✅ | Node.js 16.13.2 |
 | custom:rustserverredirect | `ghcr.io/goover/custom:rustserverredirect` | ✅ | ❌ | Rust Server Redirect |
 
 ---

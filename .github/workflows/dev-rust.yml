@@ -1,7 +1,6 @@
 name: build rust
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * 1"
@@ -20,8 +19,54 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  push:
-    name: "rust:${{ matrix.tag }}"
+  build:
+    name: "rust:${{ matrix.tag }} (${{ matrix.platform }})"
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        tag:
+          - latest
+        platform:
+          - linux/amd64
+          - linux/arm64
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare platform tag
+        id: prep
+        run: echo "platform_tag=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./dev/rust
+          file: ./dev/rust/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          network: host
+          provenance: false
+          tags: ghcr.io/goover/rust:${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          cache-from: type=gha,scope=rust-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          cache-to: type=gha,mode=max,scope=rust-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+
+  merge:
+    name: "rust:${{ matrix.tag }} (manifest)"
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -30,28 +75,15 @@ jobs:
           - latest
 
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/setup-qemu-action@v4
-
-      - uses: docker/setup-buildx-action@v4
-        with:
-          buildkitd-flags: --debug
-
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v7
-        with:
-          context: ./dev/rust
-          file: ./dev/rust/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          network: host
-          tags: |
-            ghcr.io/goover/rust:${{ matrix.tag }}
-          cache-from: type=gha,scope=rust-${{ matrix.tag }}
-          cache-to: type=gha,mode=max,scope=rust-${{ matrix.tag }}
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/goover/rust:${{ matrix.tag }} \
+            ghcr.io/goover/rust:${{ matrix.tag }}-linux-amd64 \
+            ghcr.io/goover/rust:${{ matrix.tag }}-linux-arm64

@@ -27,7 +27,6 @@ jobs:
       fail-fast: false
       matrix:
         oses:
-          - node16132
           - rustserverredirect
 
     steps:
@@ -51,5 +50,5 @@ jobs:
           push: true
           network: host
           tags: ghcr.io/goover/custom:${{ matrix.oses }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=custom-${{ matrix.oses }}
+          cache-to: type=gha,mode=max,scope=custom-${{ matrix.oses }}

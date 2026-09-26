@@ -57,5 +57,5 @@ jobs:
           push: true
           network: host
           tags: "ghcr.io/goover/steamcmd:${{ matrix.distro }}"
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=steamcmd-${{ matrix.distro }}
+          cache-to: type=gha,mode=max,scope=steamcmd-${{ matrix.distro }}

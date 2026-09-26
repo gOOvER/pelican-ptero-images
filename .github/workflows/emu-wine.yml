@@ -55,5 +55,5 @@ jobs:
           tags: "ghcr.io/goover/wine:${{ matrix.tag }}"
           build-args: |
             WINE_BRANCH=${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=wine-${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=wine-${{ matrix.tag }}

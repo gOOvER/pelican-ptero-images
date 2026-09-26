@@ -1,9 +1,7 @@
-name: Dockerfile Lint
+name: Lint & Code Quality
 
 on:
   pull_request:
-    paths:
-      - '**/Dockerfile'
   workflow_dispatch:
 
 concurrency:
@@ -15,7 +13,7 @@ permissions:
 
 jobs:
   hadolint:
-    name: Lint Dockerfiles
+    name: Lint Dockerfiles (Hadolint)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,3 +24,27 @@ jobs:
           recursive: true
           failure-threshold: error
           ignore: DL3008,DL3007,DL3013,DL3018,DL4006
+
+  shellcheck:
+    name: Lint Shell Scripts (ShellCheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          severity: error
+          scandir: '.'
+          ignore_paths: '.git .github'
+
+  actionlint:
+    name: Lint GitHub Workflows (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run actionlint
+        run: |
+          bash <(curl -s https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color

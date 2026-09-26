@@ -72,8 +72,8 @@ jobs:
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/games:${{ matrix.game }}
             ghcr.io/${{ steps.owner.outputs.owner }}/games:${{ matrix.game }}-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=games-${{ matrix.game }}
+          cache-to: type=gha,mode=max,scope=games-${{ matrix.game }}
           # (progress option removed — not supported by this action version)
         # Timeout safeguard for the step
         timeout-minutes: 60

@@ -58,5 +58,5 @@ jobs:
           network: host
           tags: |
             ghcr.io/goover/installers:${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=installers-${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=installers-${{ matrix.tag }}

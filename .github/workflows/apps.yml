@@ -53,5 +53,5 @@ jobs:
           push: true
           network: host
           tags: ghcr.io/goover/apps:${{ matrix.oses }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=apps-${{ matrix.oses }}
+          cache-to: type=gha,mode=max,scope=apps-${{ matrix.oses }}

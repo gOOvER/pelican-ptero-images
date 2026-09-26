@@ -67,6 +67,6 @@ jobs:
           tags: |
             ghcr.io/${{ steps.vars.outputs.owner }}/bots:${{ matrix.tag }}
             ghcr.io/${{ steps.vars.outputs.owner }}/bots:${{ matrix.tag }}-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=bots-${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=bots-${{ matrix.tag }}
         timeout-minutes: 45

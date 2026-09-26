@@ -1,7 +1,6 @@
 name: build nodejs
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * 1"
@@ -20,8 +19,71 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  push:
-    name: "nodejs:${{ matrix.tag }}"
+  build:
+    name: "nodejs:${{ matrix.tag }} (${{ matrix.platform }})"
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        tag:
+          - 16
+          - 18
+          - 20
+          - 22
+          - 24
+          - 25
+          - 26
+        platform:
+          - linux/amd64
+          - linux/arm64
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare platform tag
+        id: prep
+        run: echo "platform_tag=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
+      - name: Determine base image
+        id: base
+        run: |
+          if [ "${{ matrix.tag }}" = "16" ] || [ "${{ matrix.tag }}" = "18" ]; then
+            echo "image=node:${{ matrix.tag }}-bookworm-slim" >> $GITHUB_OUTPUT
+          else
+            echo "image=node:${{ matrix.tag }}-trixie-slim" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./dev/nodejs
+          file: ./dev/nodejs/Dockerfile
+          build-args: |
+            NODE_BASE=${{ steps.base.outputs.image }}
+          platforms: ${{ matrix.platform }}
+          push: true
+          network: host
+          provenance: false
+          tags: ghcr.io/goover/nodejs:${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          cache-from: type=gha,scope=nodejs-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+          cache-to: type=gha,mode=max,scope=nodejs-${{ matrix.tag }}-${{ steps.prep.outputs.platform_tag }}
+
+  merge:
+    name: "nodejs:${{ matrix.tag }} (manifest)"
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -34,47 +96,17 @@ jobs:
           - 24
           - 25
           - 26
-        include:
-          - tag: 16
-            base: node:16-bookworm-slim
-          - tag: 18
-            base: node:18-bookworm-slim
-          - tag: 20
-            base: node:20-trixie-slim
-          - tag: 22
-            base: node:22-trixie-slim
-          - tag: 24
-            base: node:24-trixie-slim
-          - tag: 25
-            base: node:25-trixie-slim
-          - tag: 26
-            base: node:26-trixie-slim
 
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/setup-qemu-action@v4
-
-      - uses: docker/setup-buildx-action@v4
-        with:
-          buildkitd-flags: --debug
-
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v7
-        with:
-          context: ./dev/nodejs
-          file: ./dev/nodejs/Dockerfile
-          build-args: |
-            NODE_BASE=${{ matrix.base }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          network: host
-          tags: |
-            ghcr.io/goover/nodejs:${{ matrix.tag }}
-          cache-from: type=gha,scope=nodejs-${{ matrix.tag }}
-          cache-to: type=gha,mode=max,scope=nodejs-${{ matrix.tag }}
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/goover/nodejs:${{ matrix.tag }} \
+            ghcr.io/goover/nodejs:${{ matrix.tag }}-linux-amd64 \
+            ghcr.io/goover/nodejs:${{ matrix.tag }}-linux-arm64
