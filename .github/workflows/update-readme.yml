@@ -111,8 +111,8 @@ jobs:
           # Remove deleted Java Base versions
           for v in $(grep -oP '\| java:\K[0-9]+(?= \|)' README.md | sort -u); do
             if [ -f "java/base/Dockerfile" ]; then
-              if ! grep -q -E "-\s*['\"]?${v}['\"]?" .github/workflows/java-base.yml; then
-                echo "  ➖ Removing java:$v (no longer exists)"
+              if ! get_workflow_matrix_tags ".github/workflows/java-base.yml" | grep -qxF "$v"; then
+                echo "  ➖ Removing java:$v (no longer in workflow)"
                 sed -i "/| java:$v /d" README.md
                 CHANGES_MADE="${CHANGES_MADE}Removed Java Base: $v\n"
               fi
@@ -127,8 +127,8 @@ jobs:
           for jv in graalvm corretto zulu dragonwell liberica shenandoah; do
             for v in $(grep -oP "java:${jv}_\K[0-9]+" README.md | sort -u); do
               if [ -f "java/$jv/Dockerfile" ]; then
-                if ! grep -q -E "-\s*['\"]?${v}['\"]?" .github/workflows/java-$jv.yml; then
-                  echo "  ➖ Removing java:${jv}_$v (no longer exists)"
+                if ! get_workflow_matrix_tags ".github/workflows/java-$jv.yml" | grep -qxF "$v"; then
+                  echo "  ➖ Removing java:${jv}_$v (no longer in workflow)"
                   sed -i "/| java:${jv}_$v /d" README.md
                   CHANGES_MADE="${CHANGES_MADE}Removed Java ${jv^}: $v\n"
                 fi
@@ -144,7 +144,7 @@ jobs:
           for db in mariadb postgres mongodb redis; do
             for v in $(grep -oP "${db}:\K[a-zA-Z0-9.-]+(?= \|)" README.md | sort -u); do
               if [ -f "database/$db/Dockerfile" ] && [ -f ".github/workflows/db-$db.yml" ]; then
-                if ! grep -q -E "-\s*['\"]?${v}['\"]?" .github/workflows/db-$db.yml; then
+                if ! get_workflow_matrix_tags ".github/workflows/db-$db.yml" | grep -qxF "$v"; then
                   echo "  ➖ Removing $db:$v (no longer in workflow)"
                   sed -i "/| $db:$v /d" README.md
                   CHANGES_MADE="${CHANGES_MADE}Removed ${db^}: $v\n"
@@ -251,7 +251,7 @@ jobs:
           # ============================================
           echo "📦 Checking Java Base..."
           if [ -f "java/base/Dockerfile" ]; then
-            base_versions=$(sed -n "/matrix:/,/steps:/p" .github/workflows/java-base.yml | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | grep -v "/" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/" | sort -V -u)
+            base_versions=$(get_workflow_matrix_tags ".github/workflows/java-base.yml")
           else
             base_versions=$(get_versions "java/base")
           fi
@@ -272,7 +272,7 @@ jobs:
           for jv in graalvm corretto zulu dragonwell liberica; do
             echo "📦 Checking Java ${jv^}..."
             if [ -f "java/$jv/Dockerfile" ]; then
-              jv_versions=$(sed -n "/matrix:/,/steps:/p" .github/workflows/java-$jv.yml | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | grep -v "/" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/" | sort -V -u)
+              jv_versions=$(get_workflow_matrix_tags ".github/workflows/java-$jv.yml")
             else
               jv_versions=$(get_versions "java/$jv")
             fi
@@ -294,7 +294,7 @@ jobs:
           echo "📦 Checking Java Shenandoah..."
           shenandoah_excluded=$(get_arm64_excluded_tags ".github/workflows/java-shenandoah.yml")
           if [ -f "java/shenandoah/Dockerfile" ]; then
-            shen_versions=$(sed -n "/matrix:/,/steps:/p" .github/workflows/java-shenandoah.yml | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | grep -v "/" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/" | sort -V -u)
+            shen_versions=$(get_workflow_matrix_tags ".github/workflows/java-shenandoah.yml")
           else
             shen_versions=$(get_versions "java/shenandoah")
           fi
@@ -320,7 +320,7 @@ jobs:
           for db in mariadb postgres mongodb redis; do
             echo "📦 Checking $db..."
             if [ -f "database/$db/Dockerfile" ] && [ -f ".github/workflows/db-$db.yml" ]; then
-              db_versions=$(sed -n "/matrix:/,/steps:/p" .github/workflows/db-$db.yml | grep -E "^[[:space:]]+-[[:space:]]+" | grep -v ":" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?([^'\" ]+)['\"]?.*/\1/")
+              db_versions=$(get_workflow_matrix_tags ".github/workflows/db-$db.yml")
             else
               db_versions=$(get_versions "database/$db")
             fi
