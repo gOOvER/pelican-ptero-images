@@ -512,7 +512,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 | Description |
 |-------|:---:|:-----:|:-----:|-------------|
-| apps:discordpush | `ghcr.io/goover/apps:discordpush` | ✅ | ✅ | Discord Push Notifications |
 | apps:uptimekuma | `ghcr.io/goover/apps:uptimekuma` | ✅ | ✅ | Uptime Kuma Monitoring |
 
 ---
