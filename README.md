@@ -70,8 +70,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| nodejs:12 | `ghcr.io/goover/nodejs:12` | ✅ | ✅ |
-| nodejs:14 | `ghcr.io/goover/nodejs:14` | ✅ | ✅ |
 | nodejs:16 | `ghcr.io/goover/nodejs:16` | ✅ | ✅ |
 | nodejs:18 | `ghcr.io/goover/nodejs:18` | ✅ | ✅ |
 | nodejs:20 | `ghcr.io/goover/nodejs:20` | ✅ | ✅ |
@@ -144,8 +142,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| dotnet:3.1 | `ghcr.io/goover/dotnet:3.1` | ✅ | ❌ |
-| dotnet:5 | `ghcr.io/goover/dotnet:5` | ✅ | ❌ |
 | dotnet:6 | `ghcr.io/goover/dotnet:6` | ✅ | ❌ |
 | dotnet:6-sdk | `ghcr.io/goover/dotnet:6-sdk` | ✅ | ❌ |
 | dotnet:7 | `ghcr.io/goover/dotnet:7` | ✅ | ❌ |
@@ -193,8 +189,6 @@ periodically to ensure dependencies are always up-to-date.
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
 | elixir:latest | `ghcr.io/goover/elixir:latest` | ✅ | ✅ |
-| elixir:1.12 | `ghcr.io/goover/elixir:1.12` | ✅ | ✅ |
-| elixir:1.13 | `ghcr.io/goover/elixir:1.13` | ✅ | ✅ |
 | elixir:1.14 | `ghcr.io/goover/elixir:1.14` | ✅ | ✅ |
 | elixir:1.15 | `ghcr.io/goover/elixir:1.15` | ✅ | ✅ |
 | elixir:1.16 | `ghcr.io/goover/elixir:1.16` | ✅ | ✅ |
@@ -271,7 +265,7 @@ periodically to ensure dependencies are always up-to-date.
 |-------|:---:|:-----:|:-----:|
 | java:zulu_8 | `ghcr.io/goover/java:zulu_8` | ✅ | ✅ |
 | java:zulu_11 | `ghcr.io/goover/java:zulu_11` | ✅ | ✅ |
-| java:zulu_13 | `ghcr.io/goover/java:zulu_13` | ✅ | ✅ |
+| java:zulu_13 | `ghcr.io/goover/java:zulu_13` | ✅ | ❌ |
 | java:zulu_15 | `ghcr.io/goover/java:zulu_15` | ✅ | ✅ |
 | java:zulu_17 | `ghcr.io/goover/java:zulu_17` | ✅ | ✅ |
 | java:zulu_18 | `ghcr.io/goover/java:zulu_18` | ✅ | ✅ |
@@ -327,7 +321,7 @@ periodically to ensure dependencies are always up-to-date.
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
 | java:shenandoah_8 | `ghcr.io/goover/java:shenandoah_8` | ✅ | ❌ |
-| java:shenandoah_11 | `ghcr.io/goover/java:shenandoah_11` | ✅ | ❌ |
+| java:shenandoah_11 | `ghcr.io/goover/java:shenandoah_11` | ✅ | ✅ |
 | java:shenandoah_17 | `ghcr.io/goover/java:shenandoah_17` | ✅ | ✅ |
 | java:shenandoah_21 | `ghcr.io/goover/java:shenandoah_21` | ✅ | ✅ |
 | java:shenandoah_25 | `ghcr.io/goover/java:shenandoah_25` | ✅ | ✅ |
@@ -544,7 +538,6 @@ periodically to ensure dependencies are always up-to-date.
 
 | Image | URI | AMD64 | ARM64 |
 |-------|:---:|:-----:|:-----:|
-| debian:11-bullseye | `ghcr.io/goover/debian:11-bullseye` | ✅ | ✅ |
 | debian:12-bookworm | `ghcr.io/goover/debian:12-bookworm` | ✅ | ✅ |
 | debian:13-trixie | `ghcr.io/goover/debian:13-trixie` | ✅ | ✅ |
 
