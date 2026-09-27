@@ -44,13 +44,87 @@ line() {
 # ----------------------------
 trap 'echo "$(date +%Y-%m-%d\ %H:%M:%S) - Unexpected error at line $LINENO" | tee -a "$ERROR_LOG" >&2' ERR
 
+detect_virt() {
+    local vm=""
+
+    if command -v systemd-detect-virt >/dev/null 2>&1; then
+        local raw_vm
+        raw_vm=$(systemd-detect-virt --vm 2>/dev/null || true)
+        [ "$raw_vm" != "none" ] && [ -n "$raw_vm" ] && vm="$raw_vm"
+    fi
+
+    if [ -z "$vm" ] && grep -qi "microsoft" /proc/version 2>/dev/null; then
+        vm="WSL2"
+    fi
+
+    if [ -z "$vm" ]; then
+        local dmi_str=""
+        for d in /sys/class/dmi/id /sys/devices/virtual/dmi/id; do
+            if [ -d "$d" ]; then
+                dmi_str="$(cat "$d/product_name" "$d/sys_vendor" "$d/bios_vendor" 2>/dev/null || true)"
+                break
+            fi
+        done
+        case "$dmi_str" in
+            *KVM*|*Bochs*) vm="KVM";;
+            *QEMU*) vm="QEMU";;
+            *VMware*) vm="VMware";;
+            *VirtualBox*|*innotek*) vm="VirtualBox";;
+            *Hyper-V*|*Microsoft*) vm="Hyper-V";;
+            *Xen*) vm="Xen";;
+            *Amazon*|*EC2*) vm="KVM (AWS)";;
+            *Google*) vm="KVM (GCP)";;
+            *Proxmox*) vm="KVM (Proxmox)";;
+        esac
+    fi
+
+    if [ -z "$vm" ] && [ -r /proc/device-tree/hypervisor/compatible ]; then
+        local dt
+        dt=$(cat /proc/device-tree/hypervisor/compatible 2>/dev/null || true)
+        case "$dt" in
+            *kvm*) vm="KVM";;
+            *qemu*) vm="QEMU";;
+            *xen*) vm="Xen";;
+            *) [ -n "$dt" ] && vm="$dt";;
+        esac
+    fi
+
+    if [ -z "$vm" ] && [ -r /proc/cpuinfo ]; then
+        if grep -qi "QEMU Virtual CPU" /proc/cpuinfo 2>/dev/null; then
+            vm="QEMU"
+        elif grep -qi "Common KVM processor" /proc/cpuinfo 2>/dev/null; then
+            vm="KVM"
+        elif grep -qi "VMware" /proc/cpuinfo 2>/dev/null; then
+            vm="VMware"
+        elif grep -qE '^(flags|Features)[[:space:]]*:.*hypervisor' /proc/cpuinfo 2>/dev/null; then
+            vm="Hypervisor"
+        fi
+    fi
+
+    case "$vm" in
+        kvm) vm="KVM";;
+        qemu) vm="QEMU";;
+        vmware) vm="VMware";;
+        oracle) vm="VirtualBox";;
+        microsoft) vm="Hyper-V";;
+        xen) vm="Xen";;
+        bochs) vm="Bochs";;
+        parallels) vm="Parallels";;
+        bhyve) vm="bhyve";;
+        "") vm="Bare Metal";;
+    esac
+
+    echo "$vm"
+}
+
 # ----------------------------
 # System Info
 # ----------------------------
+KERNEL=$(uname -r)
+VIRT=$(detect_virt)
 LINUX=$(. /etc/os-release; echo "$PRETTY_NAME")
 TIMEZONE=$(if [ -f /etc/timezone ]; then cat /etc/timezone; else readlink /etc/localtime | sed 's|.*/zoneinfo/||'; fi)
 # Kernel information from the host (name, release, architecture). Fallback to uname -r or 'unknown'.
-KERNEL_INFO=$(uname -srm 2>/dev/null || uname -r 2>/dev/null || echo 'unknown')
 
 # ----------------------------
 # Banner
@@ -60,9 +134,12 @@ line BLUE
 msg RED "SteamCMD Image by gOOvER - https://dsc.gg/goover"
 msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
-msg YELLOW "System Information:"
+msg YELLOW "Host System:"
+msg YELLOW "  • Kernel:             ${RED}$KERNEL"
+msg YELLOW "  • Virtualization:     ${RED}$VIRT"
+line BLUE
+msg YELLOW "Container System:"
 msg YELLOW "  • Linux Distribution: ${RED}$LINUX"
-msg YELLOW "  • Kernel:             ${RED}$KERNEL_INFO"
 msg YELLOW "  • Current timezone:   ${RED}$TIMEZONE"
 line BLUE
 
