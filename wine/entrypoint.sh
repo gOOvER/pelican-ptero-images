@@ -7,12 +7,12 @@ ERROR_LOG="install_error.log"
 # ----------------------------
 # Colors via tput
 # ----------------------------
-RED=$(tput setaf 1)
-GREEN=$(tput setaf 2)
-YELLOW=$(tput setaf 3)
-BLUE=$(tput setaf 4)
-CYAN=$(tput setaf 6)
-NC=$(tput sgr0)
+RED=$(tput setaf 1 2>/dev/null || printf '\033[0;31m')
+GREEN=$(tput setaf 2 2>/dev/null || printf '\033[0;32m')
+YELLOW=$(tput setaf 3 2>/dev/null || printf '\033[0;33m')
+BLUE=$(tput setaf 4 2>/dev/null || printf '\033[0;34m')
+CYAN=$(tput setaf 6 2>/dev/null || printf '\033[0;36m')
+NC=$(tput sgr0 2>/dev/null || printf '\033[0m')
 
 # ----------------------------
 # Functions
@@ -319,59 +319,68 @@ if [ ! -d "$WINEPREFIX/drive_c" ]; then
     wineboot --init || { msg RED "wineboot failed!"; exit 1; }
 fi
 
-line BLUE
-msg YELLOW "Importing system root CA certificates into Wine (this may take a few minutes)"
-line BLUE
-CERT_LOG="$WINEPREFIX/logs/certs_import.log"
-rotate_log "$CERT_LOG" 5242880 3 || true
-
-TMPDIR=$(mktemp -d 2>/dev/null || mktemp -d -t winecerts 2>/dev/null || true)
-if [ -z "$TMPDIR" ] || [ ! -d "$TMPDIR" ]; then
-    msg RED "Failed to create temporary working directory for certificate import; skipping import"
+if [ -f "$WINEPREFIX/.certs_imported" ]; then
+    info "Root CA certificates already imported into Wine prefix - skipping"
 else
-    # Perform the entire import in a subshell so we never change the parent cwd
-    (
-        set -e
-        cd "$TMPDIR" || exit 1
-        msg YELLOW "Downloading latest CA bundle..."
-        if ! curl -fsSLo cacert.pem https://curl.se/ca/cacert.pem >>"$CERT_LOG" 2>&1; then
-            msg RED "Failed to download CA bundle; see $CERT_LOG"
-            exit 0
-        fi
+    line BLUE
+    msg YELLOW "Importing system root CA certificates into Wine (initial setup)"
+    line BLUE
+    CERT_LOG="$WINEPREFIX/logs/certs_import.log"
+    rotate_log "$CERT_LOG" 5242880 3 || true
 
-        # sanity check: file non-empty
-        if [ ! -s cacert.pem ]; then
-            msg RED "Downloaded CA bundle is empty; aborting import (see $CERT_LOG)"
-            exit 0
-        fi
-
-        # normalize CRLF if dos2unix is available, otherwise use sed fallback
-        if command -v dos2unix >/dev/null 2>&1; then
-            dos2unix -q cacert.pem >>"$CERT_LOG" 2>&1 || true
-        else
-            sed -i 's/\r$//' cacert.pem || true
-        fi
-
-        msg YELLOW "Splitting PEM bundle into individual cert files (robust split)..."
-        awk 'BEGIN{n=0} /-----BEGIN CERTIFICATE-----/{n++; fname=sprintf("cert%04d.pem",n)} fname{print > fname}' cacert.pem 2>>"$CERT_LOG" || true
-        find . -maxdepth 1 -type f -name 'cert*.pem' -size 0 -delete
-        progress 1 2 "Converting and importing certificates..."
-        msg YELLOW "Converting valid PEM files to DER (.cer) and importing into Wine's root store..."
-        for pem in cert*.pem; do
-            [ -f "$pem" ] || continue
-            if ! grep -q '-----BEGIN CERTIFICATE-----' "$pem" 2>>"$CERT_LOG"; then
-                continue
+    TMPDIR=$(mktemp -d 2>/dev/null || mktemp -d -t winecerts 2>/dev/null || true)
+    if [ -z "$TMPDIR" ] || [ ! -d "$TMPDIR" ]; then
+        msg RED "Failed to create temporary working directory for certificate import; skipping import"
+    else
+        # Perform the entire import in a subshell so we never change the parent cwd
+        (
+            set -e
+            cd "$TMPDIR" || exit 1
+            if [ -s /etc/ssl/certs/ca-certificates.crt ]; then
+                cp /etc/ssl/certs/ca-certificates.crt cacert.pem
+            else
+                msg YELLOW "Downloading latest CA bundle..."
+                if ! curl -fsSLo cacert.pem https://curl.se/ca/cacert.pem >>"$CERT_LOG" 2>&1; then
+                    msg RED "Failed to download CA bundle; see $CERT_LOG"
+                    exit 0
+                fi
             fi
-            cer="${pem%.pem}.cer"
-            if openssl x509 -inform PEM -in "$pem" -outform DER -out "$cer" >>"$CERT_LOG" 2>&1; then
-                wine rundll32.exe cryptext.dll,CryptExtAddCer "$(pwd)/$cer" >>"$CERT_LOG" 2>&1 || true
+
+            # sanity check: file non-empty
+            if [ ! -s cacert.pem ]; then
+                msg RED "CA bundle is empty; aborting import (see $CERT_LOG)"
+                exit 0
             fi
-        done
-        progress 2 2 "Certificate import complete"
-        msg GREEN "Certificate import finished (logs: $CERT_LOG)"
-    )
-    # ensure TMPDIR removed in case subshell exited early
-    rm -rf "$TMPDIR" >/dev/null 2>&1 || true
+
+            # normalize CRLF if dos2unix is available, otherwise use sed fallback
+            if command -v dos2unix >/dev/null 2>&1; then
+                dos2unix -q cacert.pem >>"$CERT_LOG" 2>&1 || true
+            else
+                sed -i 's/\r$//' cacert.pem || true
+            fi
+
+            msg YELLOW "Splitting PEM bundle into individual cert files..."
+            awk 'BEGIN{n=0} /-----BEGIN CERTIFICATE-----/{n++; fname=sprintf("cert%04d.pem",n)} fname{print > fname}' cacert.pem 2>>"$CERT_LOG" || true
+            find . -maxdepth 1 -type f -name 'cert*.pem' -size 0 -delete
+            progress 1 2 "Converting and importing certificates..."
+            msg YELLOW "Converting valid PEM files to DER (.cer) and importing into Wine's root store..."
+            for pem in cert*.pem; do
+                [ -f "$pem" ] || continue
+                if ! grep -q '-----BEGIN CERTIFICATE-----' "$pem" 2>>"$CERT_LOG"; then
+                    continue
+                fi
+                cer="${pem%.pem}.cer"
+                if openssl x509 -inform PEM -in "$pem" -outform DER -out "$cer" >>"$CERT_LOG" 2>&1; then
+                    wine rundll32.exe cryptext.dll,CryptExtAddCer "$(pwd)/$cer" >>"$CERT_LOG" 2>&1 || true
+                fi
+            done
+            progress 2 2 "Certificate import complete"
+            msg GREEN "Certificate import finished (logs: $CERT_LOG)"
+            touch "$WINEPREFIX/.certs_imported"
+        )
+        # ensure TMPDIR removed in case subshell exited early
+        rm -rf "$TMPDIR" >/dev/null 2>&1 || true
+    fi
 fi
 
 # NOTE: 64-bit is the default (WINEARCH=win64). No automatic 32-bit enforcement is performed.
@@ -385,124 +394,143 @@ if [[ "$WINETRICKS_RUN" =~ ntsync ]]; then
 fi
 
 # ----------------------------
+# ----------------------------
+# Marker directory for tracking winetricks / component installations
+# ----------------------------
+WINETRICKS_MARKER_DIR="$WINEPREFIX/.winetricks_markers"
+mkdir -p "$WINETRICKS_MARKER_DIR"
+
+# ----------------------------
 # Wine Gecko Installation
 # ----------------------------
 if [[ "$WINETRICKS_RUN" =~ gecko ]]; then
-    line BLUE
-    msg YELLOW "Installing Wine Gecko"
-    line BLUE
-    WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" gecko)
+    if [ -f "$WINETRICKS_MARKER_DIR/gecko" ]; then
+        success "Wine Gecko is already installed - skipping"
+        WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" gecko)
+    else
+        line BLUE
+        msg YELLOW "Installing Wine Gecko"
+        line BLUE
+        WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" gecko)
 
-    GECKO_VERSION=$(curl -s https://api.github.com/repos/wine-mirror/wine/releases/latest | jq -r '.tag_name // empty' 2>/dev/null || echo "2.47.4")
-    GECKO_BASE="https://dl.winehq.org/wine/wine-gecko/${GECKO_VERSION}"
+        GECKO_VERSION="${WINE_GECKO_VERSION:-2.47.4}"
+        GECKO_BASE="https://dl.winehq.org/wine/wine-gecko/${GECKO_VERSION}"
 
-    # download and install both architectures
-    for arch in x86 x86_64; do
-        MSI_FILE="$WINEPREFIX/gecko_${arch}.msi"
-        SHA_FILE="${GECKO_BASE}/wine-gecko-${GECKO_VERSION}-${arch}.msi.sha256"
-        if [ ! -s "$MSI_FILE" ]; then
-            msg YELLOW "Downloading Gecko ${arch}..."
-            progress 1 3 "Fetching checksum..."
-            if ! GECKO_SHA=$(curl -s "$SHA_FILE" | awk '{print $1}' | head -c 64); then
-                msg RED "Failed to fetch Gecko ${arch} checksum"
+        # download and install both architectures
+        for arch in x86 x86_64; do
+            MSI_FILE="$WINEPREFIX/gecko_${arch}.msi"
+            SHA_FILE="${GECKO_BASE}/wine-gecko-${GECKO_VERSION}-${arch}.msi.sha256"
+            if [ ! -s "$MSI_FILE" ]; then
+                msg YELLOW "Downloading Gecko ${arch}..."
+                progress 1 3 "Fetching checksum..."
+                if ! GECKO_SHA=$(curl -s "$SHA_FILE" | awk '{print $1}' | head -c 64); then
+                    msg RED "Failed to fetch Gecko ${arch} checksum"
+                    exit 1
+                fi
+                if ! wget -q --tries=3 --timeout=30 -O "$MSI_FILE" "${GECKO_BASE}/wine-gecko-${GECKO_VERSION}-${arch}.msi"; then
+                    msg RED "Failed to download Gecko ${arch}"
+                    exit 1
+                fi
+                progress 2 3 "Validating checksum..."
+                COMPUTED_SHA=$(sha256sum "$MSI_FILE" | awk '{print $1}')
+                if [ "$COMPUTED_SHA" != "$GECKO_SHA" ]; then
+                    msg RED "Gecko ${arch} checksum mismatch! Expected: $GECKO_SHA, Got: $COMPUTED_SHA"
+                    rm -f "$MSI_FILE"
+                    exit 1
+                fi
+            fi
+            if [ -s "$MSI_FILE" ]; then
+                progress 3 3 "Installing Gecko ${arch}..."
+                if ! wine msiexec /i "$MSI_FILE" /qn /norestart /log "$WINEPREFIX/gecko_${arch}_install.log"; then
+                    msg RED "Wine Gecko ${arch} installation failed! See $WINEPREFIX/gecko_${arch}_install.log"
+                    exit 1
+                fi
+            else
+                msg RED "Gecko ${arch} MSI missing or empty: $MSI_FILE"
                 exit 1
             fi
-            if ! wget -q --tries=3 --timeout=30 -O "$MSI_FILE" "${GECKO_BASE}/wine-gecko-${GECKO_VERSION}-${arch}.msi"; then
-                msg RED "Failed to download Gecko ${arch}"
-                exit 1
-            fi
-            progress 2 3 "Validating checksum..."
-            COMPUTED_SHA=$(sha256sum "$MSI_FILE" | awk '{print $1}')
-            if [ "$COMPUTED_SHA" != "$GECKO_SHA" ]; then
-                msg RED "Gecko ${arch} checksum mismatch! Expected: $GECKO_SHA, Got: $COMPUTED_SHA"
-                rm -f "$MSI_FILE"
-                exit 1
-            fi
-        fi
-        if [ -s "$MSI_FILE" ]; then
-            progress 3 3 "Installing Gecko ${arch}..."
-            if ! wine msiexec /i "$MSI_FILE" /qn /norestart /log "$WINEPREFIX/gecko_${arch}_install.log"; then
-                msg RED "Wine Gecko ${arch} installation failed! See $WINEPREFIX/gecko_${arch}_install.log"
-                exit 1
-            fi
-        else
-            msg RED "Gecko ${arch} MSI missing or empty: $MSI_FILE"
-            exit 1
-        fi
-    done
+        done
+        touch "$WINETRICKS_MARKER_DIR/gecko"
+    fi
 fi
 
 # ----------------------------
 # Wine Mono Installation
 # ----------------------------
 if [[ "$WINETRICKS_RUN" =~ mono ]]; then
-    line BLUE
-    msg YELLOW "Installing latest Wine Mono"
-    line BLUE
-    # Optionally force WINEARCH (e.g. win32) via env FORCE_WINEARCH=win32
-    if [ -n "${FORCE_WINEARCH:-}" ]; then
-        export WINEARCH="${FORCE_WINEARCH}"
-        msg YELLOW "Forcing WINEARCH=$WINEARCH"
-        # recreate prefix if necessary
-        if [ ! -d "$WINEPREFIX" ]; then
-            wineboot --init || true
-        fi
-    fi
-
-    # Allow manual override first (useful when GitHub API is rate-limited/offline)
-    MONO_VERSION="${WINE_MONO_VERSION:-}"
-    if [ -z "$MONO_VERSION" ]; then
-        MONO_API_URL="https://api.github.com/repos/wine-mono/wine-mono/releases/latest"
-        MONO_API_JSON=""
-
-        # Do not fail the whole script on transient network/API errors.
-        MONO_API_JSON=$(curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$MONO_API_URL" 2>/dev/null || true)
-
-        if [ -n "$MONO_API_JSON" ]; then
-            if command -v jq >/dev/null 2>&1; then
-                MONO_VERSION=$(printf '%s' "$MONO_API_JSON" | jq -r '.tag_name // empty' 2>/dev/null || true)
-            else
-                # Fallback parser if jq is unavailable
-                MONO_VERSION=$(printf '%s\n' "$MONO_API_JSON" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
-            fi
-        fi
-    fi
-
-    if [ -z "$MONO_VERSION" ]; then
-        warning "Could not determine latest Wine Mono version (GitHub API/network issue)."
-        info "Set WINE_MONO_VERSION (e.g. wine-mono-9.x.x) to force installation, or continue without mono."
+    if [ -f "$WINETRICKS_MARKER_DIR/mono" ]; then
+        success "Wine Mono is already installed - skipping"
         WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" mono)
     else
-        MONO_URL="https://github.com/wine-mono/wine-mono/releases/download/${MONO_VERSION}/wine-mono-${MONO_VERSION#wine-mono-}-x86.msi"
-        rm -f "$WINEPREFIX/mono.msi"
-        msg YELLOW "Downloading Wine Mono from $MONO_URL"
-        progress 1 2 "Downloading..."
-        if ! wget -q --tries=3 --timeout=30 -O "$WINEPREFIX/mono.msi" "$MONO_URL"; then
-            msg RED "Failed to download Wine Mono MSI from $MONO_URL"
-            exit 1
-        fi
-        progress 2 2 "Download complete"
-        # install with retries and logging
-        attempts=0
-        max_attempts=3
-        rc=1
-        while [ "$attempts" -lt "$max_attempts" ]; do
-            attempts=$((attempts+1))
-            msg YELLOW "Attempt $attempts to install Wine Mono..."
-            if wine msiexec /i "$WINEPREFIX/mono.msi" /qn /norestart /log "$WINEPREFIX/mono_install.log"; then
-                rc=0
-                msg GREEN "Wine Mono installed successfully on attempt $attempts"
-                break
-            else
-                msg YELLOW "Wine Mono installer failed on attempt $attempts (see $WINEPREFIX/mono_install.log)"
-                sleep 3
+        line BLUE
+        msg YELLOW "Installing latest Wine Mono"
+        line BLUE
+        # Optionally force WINEARCH (e.g. win32) via env FORCE_WINEARCH=win32
+        if [ -n "${FORCE_WINEARCH:-}" ]; then
+            export WINEARCH="${FORCE_WINEARCH}"
+            msg YELLOW "Forcing WINEARCH=$WINEARCH"
+            # recreate prefix if necessary
+            if [ ! -d "$WINEPREFIX" ]; then
+                wineboot --init || true
             fi
-        done
-        if [ "$rc" -ne 0 ]; then
-            msg RED "Wine Mono installation failed after $max_attempts attempts. See $WINEPREFIX/mono_install.log"
-            exit 1
         fi
-        WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" mono)
+
+        # Allow manual override first (useful when GitHub API is rate-limited/offline)
+        MONO_VERSION="${WINE_MONO_VERSION:-}"
+        if [ -z "$MONO_VERSION" ]; then
+            MONO_API_URL="https://api.github.com/repos/wine-mono/wine-mono/releases/latest"
+            MONO_API_JSON=""
+
+            # Do not fail the whole script on transient network/API errors.
+            MONO_API_JSON=$(curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$MONO_API_URL" 2>/dev/null || true)
+
+            if [ -n "$MONO_API_JSON" ]; then
+                if command -v jq >/dev/null 2>&1; then
+                    MONO_VERSION=$(printf '%s' "$MONO_API_JSON" | jq -r '.tag_name // empty' 2>/dev/null || true)
+                else
+                    # Fallback parser if jq is unavailable
+                    MONO_VERSION=$(printf '%s\n' "$MONO_API_JSON" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+                fi
+            fi
+        fi
+
+        if [ -z "$MONO_VERSION" ]; then
+            warning "Could not determine latest Wine Mono version (GitHub API/network issue)."
+            info "Set WINE_MONO_VERSION (e.g. wine-mono-9.x.x) to force installation, or continue without mono."
+            WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" mono)
+        else
+            MONO_URL="https://github.com/wine-mono/wine-mono/releases/download/${MONO_VERSION}/wine-mono-${MONO_VERSION#wine-mono-}-x86.msi"
+            rm -f "$WINEPREFIX/mono.msi"
+            msg YELLOW "Downloading Wine Mono from $MONO_URL"
+            progress 1 2 "Downloading..."
+            if ! wget -q --tries=3 --timeout=30 -O "$WINEPREFIX/mono.msi" "$MONO_URL"; then
+                msg RED "Failed to download Wine Mono MSI from $MONO_URL"
+                exit 1
+            fi
+            progress 2 2 "Download complete"
+            # install with retries and logging
+            attempts=0
+            max_attempts=3
+            rc=1
+            while [ "$attempts" -lt "$max_attempts" ]; do
+                attempts=$((attempts+1))
+                msg YELLOW "Attempt $attempts to install Wine Mono..."
+                if wine msiexec /i "$WINEPREFIX/mono.msi" /qn /norestart /log "$WINEPREFIX/mono_install.log"; then
+                    rc=0
+                    msg GREEN "Wine Mono installed successfully on attempt $attempts"
+                    break
+                else
+                    msg YELLOW "Wine Mono installer failed on attempt $attempts (see $WINEPREFIX/mono_install.log)"
+                    sleep 3
+                fi
+            done
+            if [ "$rc" -ne 0 ]; then
+                msg RED "Wine Mono installation failed after $max_attempts attempts. See $WINEPREFIX/mono_install.log"
+                exit 1
+            fi
+            touch "$WINETRICKS_MARKER_DIR/mono"
+            WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" mono)
+        fi
     fi
 fi
 
@@ -510,38 +538,45 @@ fi
 # vcrun2022 via winetricks
 # ----------------------------
 if [[ "$WINETRICKS_RUN" =~ vcrun2022 ]]; then
-    line BLUE
-    msg YELLOW "Installing vcrun2022 via winetricks"
-    line BLUE
-    progress 1 3 "Preparing installation..."
-    VCRUN_LOG="$WINEPREFIX/logs/winetricks-vcrun2022.log"
-    rotate_log "$VCRUN_LOG" 5242880 5 || true
-    progress 2 3 "Running winetricks..."
-    if winetricks -q vcrun2022 &> "$VCRUN_LOG"; then
-        progress 3 3 "vcrun2022 validation"
-        msg GREEN "vcrun2022 installed via winetricks (log: $VCRUN_LOG)"
+    if [ -f "$WINETRICKS_MARKER_DIR/vcrun2022" ]; then
+        success "vcrun2022 is already installed - skipping"
+        WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" vcrun2022)
     else
-        # If winetricks returned non-zero (cabextract warnings etc.) but the
-        # actual runtime DLLs exist in the prefix, allow startup to continue.
-        msg YELLOW "winetricks vcrun2022 returned non-zero; verifying required DLLs..."
-        missing_dll=0
-        for dll in msvcp140.dll vcruntime140.dll; do
-            if [ -f "$WINEPREFIX/drive_c/windows/system32/$dll" ] || [ -f "$WINEPREFIX/drive_c/windows/syswow64/$dll" ]; then
-                msg YELLOW "Found $dll in prefix"
-            else
-                msg RED "Missing $dll in prefix"
-                missing_dll=1
-            fi
-        done
-        if [ "$missing_dll" -eq 0 ]; then
-            progress 3 3 "vcrun2022 validation passed"
-            msg GREEN "Required vcrun2022 DLLs present; continuing despite winetricks warnings. (See $VCRUN_LOG for details)"
+        line BLUE
+        msg YELLOW "Installing vcrun2022 via winetricks"
+        line BLUE
+        progress 1 3 "Preparing installation..."
+        VCRUN_LOG="$WINEPREFIX/logs/winetricks-vcrun2022.log"
+        rotate_log "$VCRUN_LOG" 5242880 5 || true
+        progress 2 3 "Running winetricks..."
+        if winetricks -q vcrun2022 &> "$VCRUN_LOG"; then
+            progress 3 3 "vcrun2022 validation"
+            msg GREEN "vcrun2022 installed via winetricks (log: $VCRUN_LOG)"
+            touch "$WINETRICKS_MARKER_DIR/vcrun2022"
         else
-            msg RED "winetricks vcrun2022 failed and required DLLs are missing; see $VCRUN_LOG"
-            exit 1
+            # If winetricks returned non-zero (cabextract warnings etc.) but the
+            # actual runtime DLLs exist in the prefix, allow startup to continue.
+            msg YELLOW "winetricks vcrun2022 returned non-zero; verifying required DLLs..."
+            missing_dll=0
+            for dll in msvcp140.dll vcruntime140.dll; do
+                if [ -f "$WINEPREFIX/drive_c/windows/system32/$dll" ] || [ -f "$WINEPREFIX/drive_c/windows/syswow64/$dll" ]; then
+                    msg YELLOW "Found $dll in prefix"
+                else
+                    msg RED "Missing $dll in prefix"
+                    missing_dll=1
+                fi
+            done
+            if [ "$missing_dll" -eq 0 ]; then
+                progress 3 3 "vcrun2022 validation passed"
+                msg GREEN "Required vcrun2022 DLLs present; continuing despite winetricks warnings. (See $VCRUN_LOG for details)"
+                touch "$WINETRICKS_MARKER_DIR/vcrun2022"
+            else
+                msg RED "winetricks vcrun2022 failed and required DLLs are missing; see $VCRUN_LOG"
+                exit 1
+            fi
         fi
+        WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" vcrun2022)
     fi
-    WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" vcrun2022)
 fi
 
 # ----------------------------
@@ -556,6 +591,10 @@ if [ -n "${WINETRICKS_RUN// }" ]; then
         # Split into array on whitespace (preserves quoted args if any)
         read -r -a _tricks <<<"$WINETRICKS_RUN"
         for trick in "${_tricks[@]}"; do
+            if [ -f "$WINETRICKS_MARKER_DIR/$trick" ]; then
+                success "Winetricks: $trick is already installed - skipping"
+                continue
+            fi
             line BLUE
             msg YELLOW "Installing: ${GREEN}$trick"
             line BLUE
@@ -577,6 +616,7 @@ if [ -n "${WINETRICKS_RUN// }" ]; then
                 if eval "$DBG_ENV winetricks -q \"$trick\" &> \"$LOGFILE\""; then
                     progress 3 3 "$trick installation verified"
                     msg GREEN "Winetricks: $trick installed successfully (log: $LOGFILE)"
+                    touch "$WINETRICKS_MARKER_DIR/$trick"
                 else
                     msg YELLOW "Winetricks failed for $trick; attempting direct installer from winetricks cache"
                     CACHE_DIR="/home/container/.cache/winetricks/$trick"
@@ -599,11 +639,13 @@ if [ -n "${WINETRICKS_RUN// }" ]; then
                         if eval "$DIRECT_DBG_ENV wine \"$INSTALLER\" /quiet &>> \"$DIRECT_LOG\""; then
                             progress 3 3 "$trick installation verified"
                             msg GREEN "Direct dotnet installer (/quiet) succeeded (log: $DIRECT_LOG)"
+                            touch "$WINETRICKS_MARKER_DIR/$trick"
                         else
                             msg YELLOW "Direct dotnet installer (/quiet) failed, trying interactive run (no /quiet)"
                             if eval "$DIRECT_DBG_ENV wine \"$INSTALLER\" &>> \"$DIRECT_LOG\""; then
                                 progress 3 3 "$trick installation verified"
                                 msg GREEN "Direct dotnet installer (interactive) succeeded (log: $DIRECT_LOG)"
+                                touch "$WINETRICKS_MARKER_DIR/$trick"
                             else
                                 msg RED "Direct dotnet installer failed; see $DIRECT_LOG and $LOGFILE for details"
                                 # Truncate direct log to last 2000 lines to avoid giant files
@@ -621,6 +663,7 @@ if [ -n "${WINETRICKS_RUN// }" ]; then
                 if winetricks -q "$trick" &> "$LOGFILE"; then
                     progress 3 3 "$trick installation verified"
                     msg GREEN "Winetricks: $trick installed successfully (log: $LOGFILE)"
+                    touch "$WINETRICKS_MARKER_DIR/$trick"
                 else
                     msg RED "Winetricks installation for $trick failed! See $LOGFILE"
                     exit 1

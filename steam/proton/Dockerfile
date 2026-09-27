@@ -28,7 +28,7 @@ RUN dpkg --add-architecture i386 && \
     locales \
     numactl \
     openssl \
-    python3-full \
+    python3 \
     tar \
     tini \
     wget \
@@ -53,7 +53,7 @@ RUN dpkg --add-architecture i386 && \
     libpulse0 \
     mesa-vulkan-drivers \
     mesa-vulkan-drivers:i386 && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /usr/share/doc/* /usr/share/man/*
 
 # Download and install Proton-GE latest release into /opt and register with Steam
 ARG GITHUB_TOKEN=""

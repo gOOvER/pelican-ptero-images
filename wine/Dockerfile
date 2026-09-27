@@ -8,18 +8,22 @@ LABEL org.opencontainers.image.licenses=AGPL-3.0-or-later
 ARG DEBIAN_FRONTEND=noninteractive
 ARG WINE_BRANCH=stable
 
-# Install all dependencies
+# Install all dependencies and Wine in a single layer
 RUN dpkg --add-architecture i386 && \
+    apt update && \
+    apt install -y --no-install-recommends ca-certificates curl gnupg2 wget && \
+    mkdir -pm755 /etc/apt/keyrings && \
+    wget -qO /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key && \
+    wget -qNP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/trixie/winehq-trixie.sources && \
     apt update && \
     apt -y upgrade && \
     apt install -y --no-install-recommends \
-        nala \
+        winehq-${WINE_BRANCH} \
         apt-transport-https \
         binutils \
         ca-certificates \
         cabextract \
         curl \
-        dos2unix \
         file \
         ffmpeg \
         g++ \
@@ -39,7 +43,6 @@ RUN dpkg --add-architecture i386 && \
         rapidjson-dev \
         sqlite3 \
         tar \
-        telnet \
         tini \
         tzdata \
         unzip \
@@ -73,22 +76,13 @@ RUN dpkg --add-architecture i386 && \
         libunwind8 \
         libz-dev \
         libzip5 && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install Wine (choose branch via WINE_BRANCH arg) and Winetricks
-RUN mkdir -pm755 /etc/apt/keyrings && \
-    wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key && \
-    wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/trixie/winehq-trixie.sources && \
-    apt update && \
-    apt install -y --no-install-recommends winehq-${WINE_BRANCH} cabextract && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/* && \
     wget -q -O /usr/sbin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks && \
     chmod +x /usr/sbin/winetricks && \
-    wget -q -O /usr/share/bash-completion/completions/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks.bash-completion
+    wget -q -O /usr/share/bash-completion/completions/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks.bash-completion && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/* /usr/share/man/*
 
-# Install rcon-cli with SHA256 validation
+# Install rcon-cli
 RUN cd /tmp/ && \
     RCON_VERSION="0.10.3" && \
     curl -sSL https://github.com/gorcon/rcon-cli/releases/download/v${RCON_VERSION}/rcon-${RCON_VERSION}-amd64_linux.tar.gz -o rcon.tar.gz && \
@@ -114,9 +108,6 @@ ENV HOME=/home/container \
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen
 
-# Increase vm.max_map_count for Conan Exiles
-RUN echo "vm.max_map_count = 16777216" > /etc/sysctl.d/20-max_map_count.conf
-
 # Create user and set working directory
 RUN useradd -m -d /home/container -s /bin/bash container && \
     mkdir -p /home/container && \
@@ -124,7 +115,7 @@ RUN useradd -m -d /home/container -s /bin/bash container && \
 
 # Copy entrypoint script and set permissions (as root)
 COPY --chown=container:container ./entrypoint.sh /entrypoint.sh
-RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 USER container
 WORKDIR /home/container

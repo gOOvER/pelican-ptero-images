@@ -880,7 +880,7 @@ if ! kill -0 "$SERVER_PID" 2>/dev/null; then
 
         # 2. Show Proton logs
         if [ -d "$PROTON_LOG_DIR" ]; then
-            latest_proton_log=$(find "$PROTON_LOG_DIR" -type f \( -name "*.log" -o -name "steam-*" \) 2>/dev/null | xargs ls -t 2>/dev/null | head -n1)
+            latest_proton_log=$(find "$PROTON_LOG_DIR" -type f \( -name "*.log" -o -name "steam-*" \) 2>/dev/null | xargs -r ls -t 2>/dev/null | head -n1)
             if [ -n "$latest_proton_log" ] && [ -s "$latest_proton_log" ]; then
                 msg YELLOW "🍷 Latest Proton/Wine log: $(basename "$latest_proton_log")"
                 tail -n 20 "$latest_proton_log" 2>/dev/null | sed 's/^/    /' || echo "    (Could not read log)"
