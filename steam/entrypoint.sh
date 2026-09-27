@@ -59,7 +59,7 @@ line() {
     [ "$term_width" -gt 120 ] && term_width=120
     local sep
     sep=$(printf '%*s' "$term_width" '' | tr ' ' '-')
-
+    local COLOR
     case "$color" in
         RED) COLOR="$RED";;
         GREEN) COLOR="$GREEN";;
@@ -70,6 +70,12 @@ line() {
     esac
     printf "%b\n" "${COLOR}${sep}${NC}"
 }
+
+cleanup() {
+    [ -n "${LOG_PID:-}" ] && kill "$LOG_PID" 2>/dev/null || true
+    [ -n "${XVFB_PID:-}" ] && kill "$XVFB_PID" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 # Helper: remove a token (word) from a space-separated list variable
 remove_token_from_list() {
@@ -218,6 +224,10 @@ line BLUE
 # ----------------------------------------------------------
 # Set environment for Steam Proton
 # ----------------------------------------------------------
+export TZ="${TZ:-UTC}"
+internal_ip=$(ip route get 1 | awk '{print $(NF-2);exit}' 2>/dev/null || echo "127.0.0.1")
+export INTERNAL_IP="$internal_ip"
+
 # Base log directory (don't override PROTON_LOG_DIR, use separate var)
 export BASE_LOG_DIR="/home/container/logs"
 mkdir -p "$BASE_LOG_DIR"
@@ -227,6 +237,10 @@ export PROTON_LOG_DIR="$BASE_LOG_DIR/proton"
 export SERVER_LOG_DIR="$BASE_LOG_DIR/server"
 export WINETRICKS_LOG_DIR="$BASE_LOG_DIR/winetricks"
 mkdir -p "$PROTON_LOG_DIR" "$SERVER_LOG_DIR" "$WINETRICKS_LOG_DIR"
+
+# Keep last 5 startup and winetricks logs to prevent unbounded disk growth
+find "$SERVER_LOG_DIR" -maxdepth 1 -type f -name "startup_*.log" 2>/dev/null | sort -r | tail -n +6 | xargs -r rm -f 2>/dev/null || true
+find "$WINETRICKS_LOG_DIR" -maxdepth 1 -type f -name "install_*.log" 2>/dev/null | sort -r | tail -n +6 | xargs -r rm -f 2>/dev/null || true
 
 # Enable Proton logging for debugging
 export PROTON_LOG=1
@@ -448,6 +462,11 @@ fi
 # Ensure HOME is set
 HOME=${HOME:-/home/container}
 
+if [ -z "${STEAM_APPID:-}" ] && [ -n "${SRCDS_APPID:-}" ]; then
+    STEAM_APPID="$SRCDS_APPID"
+    export STEAM_APPID
+fi
+
 if [ -n "${STEAM_APPID:-}" ]; then
     # Ensure all Steam/Proton directories live under /home/container/Steam
     # Create canonical steam directory and compatdata path
@@ -482,24 +501,10 @@ if [ -n "${STEAM_APPID:-}" ]; then
     if [ -d "/opt/ProtonGE" ]; then
         TARGET_DIR="$STEAM_COMPAT_CLIENT_INSTALL_PATH/compatibilitytools.d"
         TARGET_LINK="$TARGET_DIR/ProtonGE"
-        if [ ! -e "$TARGET_LINK" ]; then
-            mkdir -p "$TARGET_DIR"
-            if ln -s /opt/ProtonGE "$TARGET_LINK" 2>/dev/null; then
-                msg GREEN "Created symlink: $TARGET_LINK -> /opt/ProtonGE"
-            else
-                msg RED "Failed to create symlink $TARGET_LINK -> /opt/ProtonGE"
-            fi
-        else
-            if [ -L "$TARGET_LINK" ]; then
-                # If it's already a symlink, check whether it points to the same source.
-                EXIST_SRC=$(readlink -f "$TARGET_LINK" || true)
-                if [ "$EXIST_SRC" != "/opt/ProtonGE" ]; then
-                    msg YELLOW "Existing symlink $TARGET_LINK points to $EXIST_SRC; not modifying."
-                fi
-            else
-                # Target exists and is not a symlink (file/dir) — do not overwrite.
-                msg YELLOW "Target $TARGET_LINK already exists and is not a symlink; skipping symlink creation to avoid data loss."
-            fi
+        mkdir -p "$TARGET_DIR"
+        if [ ! -e "$TARGET_LINK" ] || [ -L "$TARGET_LINK" ]; then
+            ln -sfn /opt/ProtonGE "$TARGET_LINK"
+            msg GREEN "Created symlink: $TARGET_LINK -> /opt/ProtonGE"
         fi
     fi
 else
@@ -510,8 +515,6 @@ else
     line BLUE
     exit 1
 fi
-
-sleep 2
 
 # ----------------------------
 # Switch to the container's working directory
@@ -676,31 +679,24 @@ if [ -n "${WINETRICKS_RUN:-}" ]; then
             # Now find and export Proton's Wine binaries for winetricks
             # Proton stores wine64/wineserver in dist/bin or files/bin
             if [ -z "${WINE:-}" ]; then
-                # Try dist/bin first (newer Proton-GE versions)
-                if [ -f "$PROTON_PATH/dist/bin/wine64" ]; then
-                    export WINE="$PROTON_PATH/dist/bin/wine64"
-                    export WINESERVER="$PROTON_PATH/dist/bin/wineserver"
-                    export WINELOADER="$PROTON_PATH/dist/bin/wine64"
-                    export PATH="$PROTON_PATH/dist/bin:$PATH"
-                    export LD_LIBRARY_PATH="$PROTON_PATH/dist/lib64:$PROTON_PATH/dist/lib:${LD_LIBRARY_PATH:-}"
-                    success "Using Proton Wine from dist/bin: $WINE"
-                # Try files/bin (older versions)
-                elif [ -f "$PROTON_PATH/files/bin/wine64" ]; then
-                    export WINE="$PROTON_PATH/files/bin/wine64"
-                    export WINESERVER="$PROTON_PATH/files/bin/wineserver"
-                    export WINELOADER="$PROTON_PATH/files/bin/wine64"
-                    export PATH="$PROTON_PATH/files/bin:$PATH"
-                    export LD_LIBRARY_PATH="$PROTON_PATH/files/lib64:$PROTON_PATH/files/lib:${LD_LIBRARY_PATH:-}"
-                    success "Using Proton Wine from files/bin: $WINE"
-                # Fallback: try dist/bin/wine (without 64 suffix)
-                elif [ -f "$PROTON_PATH/dist/bin/wine" ]; then
-                    export WINE="$PROTON_PATH/dist/bin/wine"
-                    export WINESERVER="$PROTON_PATH/dist/bin/wineserver"
-                    export WINELOADER="$PROTON_PATH/dist/bin/wine"
-                    export PATH="$PROTON_PATH/dist/bin:$PATH"
-                    export LD_LIBRARY_PATH="$PROTON_PATH/dist/lib64:$PROTON_PATH/dist/lib:${LD_LIBRARY_PATH:-}"
-                    success "Using Proton Wine: $WINE"
-                else
+                found_wine=""
+                for dir in dist files; do
+                    if [ -f "$PROTON_PATH/$dir/bin/wine64" ]; then
+                        found_wine="$PROTON_PATH/$dir/bin/wine64"
+                    elif [ -f "$PROTON_PATH/$dir/bin/wine" ]; then
+                        found_wine="$PROTON_PATH/$dir/bin/wine"
+                    fi
+                    if [ -n "$found_wine" ]; then
+                        export WINE="$found_wine"
+                        export WINESERVER="$PROTON_PATH/$dir/bin/wineserver"
+                        export WINELOADER="$found_wine"
+                        export PATH="$PROTON_PATH/$dir/bin:$PATH"
+                        export LD_LIBRARY_PATH="$PROTON_PATH/$dir/lib64:$PROTON_PATH/$dir/lib:${LD_LIBRARY_PATH:-}"
+                        success "Using Proton Wine from $dir/bin: $WINE"
+                        break
+                    fi
+                done
+                if [ -z "$found_wine" ]; then
                     warning "Could not find Wine binaries in Proton"
                     info "Winetricks may fail without Wine"
                 fi
@@ -731,16 +727,9 @@ if [ -n "${WINETRICKS_RUN:-}" ]; then
             else
                 info "Installing packages: $PACKAGES_TO_INSTALL"
 
-                # Run winetricks with optional options. We intentionally allow
-                # the shell to split $WINETRICKS_RUN into separate verbs so
-                # multiple verbs can be passed in one invocation.
+                # Run winetricks with optional options
                 WINETRICKS_EXIT=0
-                if [ -n "${WINETRICKS_OPTS:-}" ]; then
-                    info "Running winetricks with options"
-                    env WINEPREFIX="$WINEPREFIX" WINETRICKS_QUIET=0 "$WINETRICKS" $WINETRICKS_OPTS $PACKAGES_TO_INSTALL 2>&1 | tee "$WINETRICKS_LOGFILE" || WINETRICKS_EXIT=${PIPESTATUS[0]}
-                else
-                    env WINEPREFIX="$WINEPREFIX" WINETRICKS_QUIET=0 "$WINETRICKS" $PACKAGES_TO_INSTALL 2>&1 | tee "$WINETRICKS_LOGFILE" || WINETRICKS_EXIT=${PIPESTATUS[0]}
-                fi
+                env WINEPREFIX="$WINEPREFIX" WINETRICKS_QUIET=0 "$WINETRICKS" ${WINETRICKS_OPTS:-} $PACKAGES_TO_INSTALL 2>&1 | tee "$WINETRICKS_LOGFILE" || WINETRICKS_EXIT=${PIPESTATUS[0]}
 
                 # Check if exit code 203 (often means "already installed" for some installers)
                 if [ $WINETRICKS_EXIT -eq 203 ]; then
@@ -830,13 +819,82 @@ stream_game_logs() {
     done
 }
 
+# Function to show detailed crash analysis
+show_crash_analysis() {
+    msg RED "🔍 Crash Diagnosis:"
+    echo ""
+
+    # 1. Show last lines of server log
+    if [ -f "$SERVER_LOG" ] && [ -s "$SERVER_LOG" ]; then
+        msg YELLOW "📋 Last 30 lines of server output:"
+        tail -n 30 "$SERVER_LOG" 2>/dev/null | sed 's/^/    /' || echo "    (Could not read log)"
+        echo ""
+    else
+        msg YELLOW "⚠ Server log is empty or missing: $SERVER_LOG"
+        echo ""
+    fi
+
+    # 2. Show Proton logs
+    if [ -d "$PROTON_LOG_DIR" ]; then
+        latest_proton_log=$(find "$PROTON_LOG_DIR" -type f \( -name "*.log" -o -name "steam-*" \) 2>/dev/null | xargs -r ls -t 2>/dev/null | head -n1)
+        if [ -n "$latest_proton_log" ] && [ -s "$latest_proton_log" ]; then
+            msg YELLOW "🍷 Latest Proton/Wine log: $(basename "$latest_proton_log")"
+            tail -n 20 "$latest_proton_log" 2>/dev/null | sed 's/^/    /' || echo "    (Could not read log)"
+            echo ""
+        else
+            msg YELLOW "⚠ No Proton logs found in: $PROTON_LOG_DIR"
+            echo ""
+        fi
+    fi
+
+    # 3. Check for Wine crash dumps
+    for crashfile in "${WINEPREFIX:-}/drive_c/windows/system32/crashdump.txt" "${WINEPREFIX:-}/*.crash" "${WINEPREFIX:-}/drive_c/*.crash"; do
+        if [ -f "$crashfile" ] && [ -s "$crashfile" ]; then
+            msg YELLOW "💥 Wine crash dump: $(basename "$crashfile")"
+            head -n 30 "$crashfile" 2>/dev/null | sed 's/^/    /' || echo "    (Could not read)"
+            echo ""
+        fi
+    done
+
+    # 4. Check for missing DLLs or common errors in logs
+    if [ -f "$SERVER_LOG" ]; then
+        if grep -qi "could not find\|cannot find\|missing" "$SERVER_LOG" 2>/dev/null; then
+            msg YELLOW "⚠ Possible missing dependencies detected:"
+            grep -i "could not find\|cannot find\|missing" "$SERVER_LOG" 2>/dev/null | tail -n 5 | sed 's/^/    /' || true
+            echo ""
+        fi
+        if grep -qi "error\|failed\|exception" "$SERVER_LOG" 2>/dev/null; then
+            msg YELLOW "❗ Errors found in server log:"
+            grep -i "error\|failed\|exception" "$SERVER_LOG" 2>/dev/null | tail -n 10 | sed 's/^/    /' || true
+            echo ""
+        fi
+    fi
+
+    # 5. System info that might help
+    msg YELLOW "💻 System info:"
+    echo "    WINEPREFIX: ${WINEPREFIX:-not set}"
+    echo "    WINEARCH: ${WINEARCH:-not set}"
+    echo "    PROTON_LOG: ${PROTON_LOG:-not set}"
+    echo ""
+
+    line RED
+    msg CYAN "📁 Full logs available at:"
+    info "  • Server: $SERVER_LOG"
+    info "  • Proton: $PROTON_LOG_DIR"
+    info "  • Winetricks: $WINETRICKS_LOG_DIR"
+    line RED
+}
+
+# From here on the setup phase is complete.
+# Disable errexit, nounset and the ERR trap so the server process and its exit code
+# are handled manually – no unexpected error messages on normal server stop.
+set +euo pipefail
+trap - ERR
+
 # Execute startup command - eval is required to handle quoted args and shell operators.
 # STARTUP is set by the panel (trusted source), not directly by end-users.
 # Process substitution (> >(...)) is used instead of a pipe so that $! captures
-# the actual server PID rather than tee's PID. A pipe would cause $! to point at
-# tee/grep, making kill/wait unreliable and potentially deadlocking when pipe
-# buffers fill. Headless noise (ALSA, DXGI, Xalia) is already suppressed via
-# WINEDEBUG, DXVK_LOG_LEVEL and /etc/asound.conf - no grep filter needed.
+# the actual server PID rather than tee's PID.
 eval "$MODIFIED_STARTUP" > >(tee -a "$SERVER_LOG") 2>&1 &
 SERVER_PID=$!
 
@@ -855,87 +913,20 @@ if [ "${STREAM_LOGS:-1}" != "0" ]; then
     LOG_PID=$!
 fi
 
-# Monitor for early crashes (first 5 seconds)
+# Monitor for early crashes (first 3 seconds)
 info "Monitoring for early crashes..."
 sleep 3
 if ! kill -0 "$SERVER_PID" 2>/dev/null; then
     line RED
     error "❌ Server crashed within 3 seconds of startup!"
     line RED
-
-    # Function to show detailed crash analysis
-    show_crash_analysis() {
-        msg RED "🔍 Crash Diagnosis:"
-        echo ""
-
-        # 1. Show last lines of server log
-        if [ -f "$SERVER_LOG" ] && [ -s "$SERVER_LOG" ]; then
-            msg YELLOW "📋 Last 30 lines of server output:"
-            tail -n 30 "$SERVER_LOG" 2>/dev/null | sed 's/^/    /' || echo "    (Could not read log)"
-            echo ""
-        else
-            msg YELLOW "⚠ Server log is empty or missing: $SERVER_LOG"
-            echo ""
-        fi
-
-        # 2. Show Proton logs
-        if [ -d "$PROTON_LOG_DIR" ]; then
-            latest_proton_log=$(find "$PROTON_LOG_DIR" -type f \( -name "*.log" -o -name "steam-*" \) 2>/dev/null | xargs -r ls -t 2>/dev/null | head -n1)
-            if [ -n "$latest_proton_log" ] && [ -s "$latest_proton_log" ]; then
-                msg YELLOW "🍷 Latest Proton/Wine log: $(basename "$latest_proton_log")"
-                tail -n 20 "$latest_proton_log" 2>/dev/null | sed 's/^/    /' || echo "    (Could not read log)"
-                echo ""
-            else
-                msg YELLOW "⚠ No Proton logs found in: $PROTON_LOG_DIR"
-                echo ""
-            fi
-        fi
-
-        # 3. Check for Wine crash dumps
-        for crashfile in "${WINEPREFIX:-}/drive_c/windows/system32/crashdump.txt" "${WINEPREFIX:-}/*.crash" "${WINEPREFIX:-}/drive_c/*.crash"; do
-            if [ -f "$crashfile" ] && [ -s "$crashfile" ]; then
-                msg YELLOW "💥 Wine crash dump: $(basename "$crashfile")"
-                head -n 30 "$crashfile" 2>/dev/null | sed 's/^/    /' || echo "    (Could not read)"
-                echo ""
-            fi
-        done
-
-        # 4. Check for missing DLLs or common errors in logs
-        if [ -f "$SERVER_LOG" ]; then
-            if grep -qi "could not find\|cannot find\|missing" "$SERVER_LOG" 2>/dev/null; then
-                msg YELLOW "⚠ Possible missing dependencies detected:"
-                grep -i "could not find\|cannot find\|missing" "$SERVER_LOG" 2>/dev/null | tail -n 5 | sed 's/^/    /' || true
-                echo ""
-            fi
-            if grep -qi "error\|failed\|exception" "$SERVER_LOG" 2>/dev/null; then
-                msg YELLOW "❗ Errors found in server log:"
-                grep -i "error\|failed\|exception" "$SERVER_LOG" 2>/dev/null | tail -n 10 | sed 's/^/    /' || true
-                echo ""
-            fi
-        fi
-
-        # 5. System info that might help
-        msg YELLOW "💻 System info:"
-        echo "    WINEPREFIX: ${WINEPREFIX:-not set}"
-        echo "    WINEARCH: ${WINEARCH:-not set}"
-        echo "    PROTON_LOG: ${PROTON_LOG:-not set}"
-        echo ""
-
-        line RED
-        msg CYAN "📁 Full logs available at:"
-        info "  • Server: $SERVER_LOG"
-        info "  • Proton: $PROTON_LOG_DIR"
-        info "  • Winetricks: $WINETRICKS_LOG_DIR"
-        line RED
-    }
-
     show_crash_analysis
 fi
 
 success "Server survived initial startup checks"
 
 # Wait for server process
-if wait $SERVER_PID 2>/dev/null; then
+if wait "$SERVER_PID" 2>/dev/null; then
     SERVER_EXIT=0
 else
     SERVER_EXIT=$?

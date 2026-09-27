@@ -118,7 +118,7 @@ line() {
     [ "$term_width" -gt 120 ] && term_width=120
     local sep
     sep=$(printf '%*s' "$term_width" '' | tr ' ' '-')
-
+    local COLOR
     case "$color" in
         RED) COLOR="$RED";;
         GREEN) COLOR="$GREEN";;
@@ -394,7 +394,6 @@ if [[ "$WINETRICKS_RUN" =~ ntsync ]]; then
 fi
 
 # ----------------------------
-# ----------------------------
 # Marker directory for tracking winetricks / component installations
 # ----------------------------
 WINETRICKS_MARKER_DIR="$WINEPREFIX/.winetricks_markers"
@@ -492,10 +491,16 @@ if [[ "$WINETRICKS_RUN" =~ mono ]]; then
                     MONO_VERSION=$(printf '%s\n' "$MONO_API_JSON" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
                 fi
             fi
+
+            # Fallback to known stable version if GitHub API is rate-limited
+            if [ -z "$MONO_VERSION" ]; then
+                MONO_VERSION="wine-mono-10.0.0"
+                info "Using default Wine Mono version: $MONO_VERSION (GitHub API offline/rate-limited)"
+            fi
         fi
 
         if [ -z "$MONO_VERSION" ]; then
-            warning "Could not determine latest Wine Mono version (GitHub API/network issue)."
+            warning "Could not determine latest Wine Mono version."
             info "Set WINE_MONO_VERSION (e.g. wine-mono-9.x.x) to force installation, or continue without mono."
             WINETRICKS_RUN=$(remove_token_from_list "$WINETRICKS_RUN" mono)
         else
@@ -753,6 +758,10 @@ if [ "${AUTO_UPDATE:-}" = "1" ]; then
         fi
         sc_args+=( +quit )
         progress 2 2 "SteamCMD download complete"
+        if [ ! -x ./steamcmd/steamcmd.sh ]; then
+            error "SteamCMD not found or not executable at ./steamcmd/steamcmd.sh"
+            exit 1
+        fi
         if ! ./steamcmd/steamcmd.sh "${sc_args[@]}"; then
             error "SteamCMD failed to update game files!"
             exit 1
@@ -767,6 +776,12 @@ fi
 # ----------------------------
 # Startup command
 # ----------------------------
+if [ -z "${STARTUP:-}" ]; then
+    error "STARTUP command not provided"
+    info "Nothing to execute - server cannot start"
+    exit 1
+fi
+
 MODIFIED_STARTUP=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')
 msg CYAN ":/home/container$ $MODIFIED_STARTUP"
 
