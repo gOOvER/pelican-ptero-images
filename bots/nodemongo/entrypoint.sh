@@ -157,6 +157,7 @@ detect_virt() {
 # ----------------------------
 # System Info
 # ----------------------------
+export GLIBC_TUNABLES="${GLIBC_TUNABLES:-glibc.pthread.rseq=1}"
 clear
 line BLUE
 msg RED "NodeJS & MongoDB Image by gOOvER - https://dsc.gg/goover"

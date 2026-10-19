@@ -133,11 +133,22 @@ detect_virt() {
 # ----------------------------
 # System Info
 # ----------------------------
+export GLIBC_TUNABLES="${GLIBC_TUNABLES:-glibc.pthread.rseq=1}"
 KERNEL=$(uname -r)
 VIRT=$(detect_virt)
+ARCH=$(uname -m)
 LINUX=$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || echo "Linux")
 TIMEZONE=$(if [ -f /etc/timezone ]; then cat /etc/timezone; elif [ -L /etc/localtime ]; then readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||'; else echo "${TZ:-UTC}"; fi)
-MONGO_VER=$(if command -v mongod >/dev/null 2>&1; then mongod --version | head -n 1; elif command -v mongo >/dev/null 2>&1; then mongo --version | head -n 1; else echo "MongoDB not found"; fi)
+MONGO_VER=$(if command -v mongod >/dev/null 2>&1; then mongod --version | head -n 1; elif command -v mongosh >/dev/null 2>&1; then mongosh --version | head -n 1; elif command -v mongo >/dev/null 2>&1; then mongo --version | head -n 1; else echo "MongoDB not found"; fi)
+
+AVX_STATUS="N/A"
+if [ "$ARCH" = "x86_64" ]; then
+    if grep -qi "avx" /proc/cpuinfo 2>/dev/null; then
+        AVX_STATUS="Supported"
+    else
+        AVX_STATUS="Missing (MongoDB 5+ requires AVX)"
+    fi
+fi
 
 # ----------------------------
 # Banner
@@ -149,7 +160,15 @@ msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
 line BLUE
 msg YELLOW "Host System:"
 msg YELLOW "  • Kernel:             ${RED}$KERNEL"
+msg YELLOW "  • Architecture:       ${RED}$ARCH"
 msg YELLOW "  • Virtualization:     ${RED}$VIRT"
+if [ "$ARCH" = "x86_64" ]; then
+    if [ "$AVX_STATUS" = "Supported" ]; then
+        msg YELLOW "  • AVX Instruction:    ${GREEN}$AVX_STATUS"
+    else
+        msg YELLOW "  • AVX Instruction:    ${RED}$AVX_STATUS"
+    fi
+fi
 line BLUE
 msg YELLOW "Container System:"
 msg YELLOW "  • Linux Distribution: ${RED}$LINUX"
@@ -172,7 +191,9 @@ export TZ="${TZ:-UTC}"
 INTERNAL_IP=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || echo "127.0.0.1")
 export INTERNAL_IP
 
-rm -rf /tmp/mongodb-27017.sock
+# Clean up stale sockets (port-agnostic)
+rm -f /tmp/mongodb-*.sock 2>/dev/null || true
+rm -rf /tmp/mongodb-27017.sock 2>/dev/null || true
 
 # ----------------------------
 # Startup

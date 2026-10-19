@@ -376,6 +376,7 @@ periodically to ensure dependencies are always up-to-date.
 | mongodb:5 | `ghcr.io/goover/mongodb:5` | ✅ | ✅ |
 | mongodb:6 | `ghcr.io/goover/mongodb:6` | ✅ | ✅ |
 | mongodb:7 | `ghcr.io/goover/mongodb:7` | ✅ | ✅ |
+| mongodb:8 | `ghcr.io/goover/mongodb:8` | ✅ | ✅ |
 
 ---
 
@@ -496,10 +497,10 @@ periodically to ensure dependencies are always up-to-date.
 | bots:nodemongo7 | `ghcr.io/goover/bots:nodemongo7` | ✅ | ✅ | Node.js + MongoDB 7 |
 | bots:parkertron | `ghcr.io/goover/bots:parkertron` | ✅ | ✅ | Parkertron Bot |
 | bots:sogebot | `ghcr.io/goover/bots:sogebot` | ✅ | ✅ | SogeBot |
-| bots:nodemongo8 | `ghcr.io/goover/bots:nodemongo8` | ✅ | ❌ |
-| bots:nodemongo83 | `ghcr.io/goover/bots:nodemongo83` | ✅ | ❌ |
-| bots:buzz | `ghcr.io/goover/bots:buzz` | ✅ | ❌ |
-| bots:nodemongotest | `ghcr.io/goover/bots:nodemongotest` | ✅ | ❌ |
+| bots:nodemongo8 | `ghcr.io/goover/bots:nodemongo8` | ✅ | ❌ | Node.js + MongoDB 8.0 |
+| bots:nodemongo83 | `ghcr.io/goover/bots:nodemongo83` | ✅ | ❌ | Node.js + MongoDB 8.3 |
+| bots:buzz | `ghcr.io/goover/bots:buzz` | ✅ | ❌ | Buzz Discord Bot |
+| bots:nodemongotest | `ghcr.io/goover/bots:nodemongotest` | ✅ | ❌ | Node.js + MongoDB Test |
 
 ---
 
