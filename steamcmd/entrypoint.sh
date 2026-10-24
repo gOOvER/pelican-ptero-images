@@ -155,6 +155,40 @@ mkdir -p "$XDG_RUNTIME_DIR"
 # ----------------------------
 # SteamCMD / DepotDownloader Update
 # ----------------------------
+# Fallback SRCDS_APPID <-> STEAM_APPID
+if [ -z "${STEAM_APPID:-}" ] && [ -n "${SRCDS_APPID:-}" ]; then
+    STEAM_APPID="$SRCDS_APPID"
+    export STEAM_APPID
+    msg YELLOW "STEAM_APPID not set, using SRCDS_APPID: ${GREEN}$SRCDS_APPID"
+fi
+
+if [ -z "${SRCDS_APPID:-}" ] && [ -n "${STEAM_APPID:-}" ]; then
+    SRCDS_APPID="$STEAM_APPID"
+    export SRCDS_APPID
+fi
+
+# Fallback SRCDS_BETAID <-> STEAM_BETAID
+if [ -z "${STEAM_BETAID:-}" ] && [ -n "${SRCDS_BETAID:-}" ]; then
+    STEAM_BETAID="$SRCDS_BETAID"
+    export STEAM_BETAID
+fi
+
+if [ -z "${SRCDS_BETAID:-}" ] && [ -n "${STEAM_BETAID:-}" ]; then
+    SRCDS_BETAID="$STEAM_BETAID"
+    export SRCDS_BETAID
+fi
+
+# Fallback SRCDS_BETAPASS <-> STEAM_BETAPASS
+if [ -z "${STEAM_BETAPASS:-}" ] && [ -n "${SRCDS_BETAPASS:-}" ]; then
+    STEAM_BETAPASS="$SRCDS_BETAPASS"
+    export STEAM_BETAPASS
+fi
+
+if [ -z "${SRCDS_BETAPASS:-}" ] && [ -n "${STEAM_BETAPASS:-}" ]; then
+    SRCDS_BETAPASS="$STEAM_BETAPASS"
+    export SRCDS_BETAPASS
+fi
+
 : "${STEAM_USER:=anonymous}"
 : "${STEAM_PASS:=}"
 : "${STEAM_AUTH:=}"
@@ -168,28 +202,32 @@ if [ -f ./DepotDownloader ]; then
     msg YELLOW "Steam user: ${GREEN}$STEAM_USER"
 
     if [ "${AUTO_UPDATE}" = "1" ]; then
-        dd_args=( -dir . -username "$STEAM_USER" -password "$STEAM_PASS" -remember-password )
-        if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
-            dd_args+=( -os windows )
-        fi
-        dd_args+=( -app "$STEAM_APPID" )
-        if [ -n "${STEAM_BETAID:-}" ]; then
-            dd_args+=( -branch "$STEAM_BETAID" )
-        fi
-        if [ -n "${STEAM_BETAPASS:-}" ]; then
-            dd_args+=( -branchpassword "$STEAM_BETAPASS" )
-        fi
-        ./DepotDownloader "${dd_args[@]}" || { msg RED "DepotDownloader failed (exit $?)"; exit 1; }
+        if [ -z "${STEAM_APPID:-}" ]; then
+            msg YELLOW "No STEAM_APPID or SRCDS_APPID specified - skipping update"
+        else
+            dd_args=( -dir . -username "$STEAM_USER" -password "$STEAM_PASS" -remember-password )
+            if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
+                dd_args+=( -os windows )
+            fi
+            dd_args+=( -app "$STEAM_APPID" )
+            if [ -n "${STEAM_BETAID:-}" ]; then
+                dd_args+=( -branch "$STEAM_BETAID" )
+            fi
+            if [ -n "${STEAM_BETAPASS:-}" ]; then
+                dd_args+=( -branchpassword "$STEAM_BETAPASS" )
+            fi
+            ./DepotDownloader "${dd_args[@]}" || { msg RED "DepotDownloader failed (exit $?)"; exit 1; }
 
-        mkdir -p .steam/sdk64
-        dd_sdk_args=( -dir .steam/sdk64 -app 1007 )
-        if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
-            dd_sdk_args+=( -os windows )
-        fi
-        ./DepotDownloader "${dd_sdk_args[@]}" || true  # SDK update failure is non-fatal
+            mkdir -p .steam/sdk64
+            dd_sdk_args=( -dir .steam/sdk64 -app 1007 )
+            if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
+                dd_sdk_args+=( -os windows )
+            fi
+            ./DepotDownloader "${dd_sdk_args[@]}" || true  # SDK update failure is non-fatal
 
-        # Only make actual executables executable, not all files
-        find "$HOME" -maxdepth 1 -type f -executable -o -name "*.sh" -o -name "*.x86_64" -o -name "*.so" 2>/dev/null | xargs -r chmod +x
+            # Only make actual executables executable, not all files
+            find "$HOME" -maxdepth 1 -type f -executable -o -name "*.sh" -o -name "*.x86_64" -o -name "*.so" 2>/dev/null | xargs -r chmod +x
+        fi
     else
         msg YELLOW "AUTO_UPDATE disabled - skipping update"
     fi
@@ -201,38 +239,42 @@ else
     msg YELLOW "Steam user: ${GREEN}$STEAM_USER"
 
     if [ "${AUTO_UPDATE}" = "1" ]; then
-        sc_args=( +force_install_dir /home/container +login "$STEAM_USER" "$STEAM_PASS" "$STEAM_AUTH" )
-        if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
-            sc_args+=( +@sSteamCmdForcePlatformType windows )
-        fi
-        if [ "${STEAM_SDK:-0}" = "1" ]; then
-            sc_args+=( +app_update 1007 )
-        fi
-        sc_args+=( +app_update "$STEAM_APPID" )
-        if [ -n "${STEAM_BETAID:-}" ]; then
-            sc_args+=( -beta "$STEAM_BETAID" )
-        fi
-        if [ -n "${STEAM_BETAPASS:-}" ]; then
-            sc_args+=( -betapassword "$STEAM_BETAPASS" )
-        fi
-        if [ -n "${INSTALL_FLAGS:-}" ]; then
-            IFS=' ' read -r -a extra_flags <<<"$INSTALL_FLAGS"
-            sc_args+=( "${extra_flags[@]}" )
-        fi
-        # Respect VALIDATE flag
-        if [ "${VALIDATE:-0}" = "1" ]; then
-            sc_args+=( validate )
-        fi
-        sc_args+=( +quit )
-        ./steamcmd/steamcmd.sh "${sc_args[@]}" || STEAMCMD_EXIT=$?
-        STEAMCMD_EXIT=${STEAMCMD_EXIT:-0}
-        # SteamCMD exit code 5 = no connection but may still have succeeded,
-        # exit code 8 = unknown, treat anything >=10 as a real failure
-        if [ "$STEAMCMD_EXIT" -ge 10 ]; then
-            msg RED "SteamCMD failed with exit code $STEAMCMD_EXIT"
-            exit "$STEAMCMD_EXIT"
-        elif [ "$STEAMCMD_EXIT" -ne 0 ]; then
-            msg YELLOW "SteamCMD exited with code $STEAMCMD_EXIT (non-fatal)"
+        if [ -z "${STEAM_APPID:-}" ]; then
+            msg YELLOW "No STEAM_APPID or SRCDS_APPID specified - skipping update"
+        else
+            sc_args=( +force_install_dir /home/container +login "$STEAM_USER" "$STEAM_PASS" "$STEAM_AUTH" )
+            if [ "${WINDOWS_INSTALL:-0}" = "1" ]; then
+                sc_args+=( +@sSteamCmdForcePlatformType windows )
+            fi
+            if [ "${STEAM_SDK:-0}" = "1" ]; then
+                sc_args+=( +app_update 1007 )
+            fi
+            sc_args+=( +app_update "$STEAM_APPID" )
+            if [ -n "${STEAM_BETAID:-}" ]; then
+                sc_args+=( -beta "$STEAM_BETAID" )
+            fi
+            if [ -n "${STEAM_BETAPASS:-}" ]; then
+                sc_args+=( -betapassword "$STEAM_BETAPASS" )
+            fi
+            if [ -n "${INSTALL_FLAGS:-}" ]; then
+                IFS=' ' read -r -a extra_flags <<<"$INSTALL_FLAGS"
+                sc_args+=( "${extra_flags[@]}" )
+            fi
+            # Respect VALIDATE flag
+            if [ "${VALIDATE:-0}" = "1" ]; then
+                sc_args+=( validate )
+            fi
+            sc_args+=( +quit )
+            ./steamcmd/steamcmd.sh "${sc_args[@]}" || STEAMCMD_EXIT=$?
+            STEAMCMD_EXIT=${STEAMCMD_EXIT:-0}
+            # SteamCMD exit code 5 = no connection but may still have succeeded,
+            # exit code 8 = unknown, treat anything >=10 as a real failure
+            if [ "$STEAMCMD_EXIT" -ge 10 ]; then
+                msg RED "SteamCMD failed with exit code $STEAMCMD_EXIT"
+                exit "$STEAMCMD_EXIT"
+            elif [ "$STEAMCMD_EXIT" -ne 0 ]; then
+                msg YELLOW "SteamCMD exited with code $STEAMCMD_EXIT (non-fatal)"
+            fi
         fi
     else
         msg YELLOW "AUTO_UPDATE disabled - skipping update"
