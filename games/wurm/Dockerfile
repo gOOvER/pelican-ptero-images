@@ -66,13 +66,17 @@ RUN         dpkg --add-architecture i386 \
                 libxi6 \
                 libxrandr2 \
                 libxss1 \
-                libxtst6
+                libxtst6 \
+            && apt-get clean \
+            && rm -rf /var/lib/apt/lists/*
 
 RUN         mkdir -p /etc/apt/keyrings
 RUN         wget -O - https://packages.adoptium.net/artifactory/api/gpg/key/public | tee /etc/apt/keyrings/adoptium.asc
 RUN         echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" | tee /etc/apt/sources.list.d/adoptium.list
-RUN         apt update
-RUN         apt install temurin-8-jdk -y
+RUN         apt update \
+            && apt install -y --no-install-recommends temurin-8-jdk \
+            && apt-get clean \
+            && rm -rf /var/lib/apt/lists/*
 
 ENV         DISPLAY=:0
 ENV         DISPLAY_WIDTH=1024

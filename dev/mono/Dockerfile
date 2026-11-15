@@ -93,15 +93,19 @@ RUN 		apt-get update \
                     libxi6 \
                     libxrandr2 \
                     libxss1 \
-                    libxtst6
+                    libxtst6 \
+            && apt-get clean \
+            && rm -rf /var/lib/apt/lists/*
 
 #install mono
 RUN         	apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
 RUN        		sh -c 'echo "deb https://download.mono-project.com/repo/debian stable-buster main" > /etc/apt/sources.list.d/mono-official-stable.list'
-RUN         	apt update
-RUN         	apt install -y \
+RUN         	apt update \
+            && apt install -y --no-install-recommends \
                 	nala \
-                	mono-complete
+                	mono-complete \
+            && apt-get clean \
+            && rm -rf /var/lib/apt/lists/*
 
 # Set the locale
 RUN        		sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \

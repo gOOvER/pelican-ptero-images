@@ -66,7 +66,7 @@ jobs:
         id: select-samples
         run: |
           # Sample representative images from different categories
-          SAMPLES='["java/zulu/21", "steam/proton", "dev/nodejs/22", "dev/python/3.12"]'
+          SAMPLES='["java/zulu", "steam/proton", "dev/nodejs", "dev/python"]'
           echo "matrix=$SAMPLES" >> $GITHUB_OUTPUT
           echo "### 🎲 Sample Image Scan" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

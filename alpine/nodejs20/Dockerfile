@@ -33,7 +33,7 @@ RUN         apk add --no-cache \
 RUN         npm install -g typescript@latest ts-node@latest
 
 ## Setup user and working directory
-RUN         adduser -D -h /home/container container -s /bin/bash container
+RUN         adduser -D -h /home/container -s /bin/ash container
 USER        container
 ENV         USER=container HOME=/home/container
 WORKDIR     /home/container

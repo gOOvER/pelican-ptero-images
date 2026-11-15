@@ -2,7 +2,7 @@ FROM debian:trixie-slim
 
 LABEL author="David Wolfe (Red-Thirten)" \
       maintainer="red_thirten@yahoo.com"
-LABEL org.opencontainers.image.source="https://github.com/pelican-eggs/yolks"
+LABEL org.opencontainers.image.source="https://github.com/gOOvER/pelican-ptero-images"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -49,6 +49,8 @@ WORKDIR /home/container
 # Copy entrypoint as the container user and make it executable
 COPY --chown=container:container entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+USER container
 
 # Use Tini as PID 1 to forward signals properly
 STOPSIGNAL SIGINT

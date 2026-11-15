@@ -54,7 +54,7 @@ RUN         apk add --update --no-cache \
 				sdl2 --repository=https://dl-cdn.alpinelinux.org/alpine/${ALPINE_BRANCH}/community
 
 ## Setup user and working directory
-RUN         adduser -D -h /home/container container -s /bin/bash container
+RUN         adduser -D -h /home/container -s /bin/ash container
 USER        container
 ENV         USER=container HOME=/home/container
 WORKDIR     /home/container
