@@ -24,6 +24,7 @@ RUN dpkg --add-architecture i386 && \
     curl \
     dbus \
     file \
+    iproute2 \
     jq \
     locales \
     numactl \
@@ -49,7 +50,6 @@ RUN dpkg --add-architecture i386 && \
     libntlm0 \
     libnss-wrapper \
     libnss3 \
-    libpulse-dev \
     libpulse0 \
     mesa-vulkan-drivers \
     mesa-vulkan-drivers:i386 && \

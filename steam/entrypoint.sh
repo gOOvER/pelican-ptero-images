@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-ERROR_LOG="install_error.log"
+mkdir -p "${HOME:-/home/container}/logs"
+ERROR_LOG="${HOME:-/home/container}/logs/entrypoint_error.log"
 : > "$ERROR_LOG"  # Clear old log file (no-op)
 
 # ----------------------------
@@ -188,9 +189,6 @@ fi
 if [ "$PROTON_VER" = "Unknown" ] && [ -f /usr/local/share/steam/compatibilitytools.d/ProtonGE/version ]; then
     PROTON_VER=$(cat /usr/local/share/steam/compatibilitytools.d/ProtonGE/version 2>/dev/null || echo "Unknown")
 fi
-if [ "$PROTON_VER" = "Unknown" ] && command -v proton >/dev/null 2>&1; then
-    PROTON_VER=$(proton --version 2>/dev/null | head -n1 || echo "Unknown")
-fi
 if [ "$PROTON_VER" = "Unknown" ]; then
     DIRNAME=$(find /opt /usr/local/share/steam/compatibilitytools.d -maxdepth 1 -type d -name 'GE-Proton*' 2>/dev/null | head -n1 || true)
     [ -n "$DIRNAME" ] && PROTON_VER="${DIRNAME##*/}"
@@ -199,9 +197,9 @@ fi
 # ----------------------------
 # Banner
 # ----------------------------
-clear
-# Prevent Wine/Proton output wrapping badly
-stty columns 250 || true
+clear 2>/dev/null || true
+# Prevent Wine/Proton output wrapping badly (ignore if no TTY attached)
+stty columns 250 2>/dev/null || true
 line BLUE
 msg RED "SteamCMD Proton-GE Image by gOOvER - https://dsc.gg/goover"
 msg RED "THIS IMAGE IS LICENSED UNDER AGPLv3"
@@ -225,8 +223,11 @@ line BLUE
 # Set environment for Steam Proton
 # ----------------------------------------------------------
 export TZ="${TZ:-UTC}"
-internal_ip=$(ip route get 1 | awk '{print $(NF-2);exit}' 2>/dev/null || echo "127.0.0.1")
-export INTERNAL_IP="$internal_ip"
+internal_ip=$(ip route get 1 2>/dev/null | awk '{print $(NF-2);exit}' || true)
+if [ -z "$internal_ip" ]; then
+    internal_ip=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
+fi
+export INTERNAL_IP="${internal_ip:-127.0.0.1}"
 
 # Base log directory (don't override PROTON_LOG_DIR, use separate var)
 export BASE_LOG_DIR="/home/container/logs"
@@ -238,27 +239,28 @@ export SERVER_LOG_DIR="$BASE_LOG_DIR/server"
 export WINETRICKS_LOG_DIR="$BASE_LOG_DIR/winetricks"
 mkdir -p "$PROTON_LOG_DIR" "$SERVER_LOG_DIR" "$WINETRICKS_LOG_DIR"
 
-# Keep last 5 startup and winetricks logs to prevent unbounded disk growth
+# Keep last 5 startup, winetricks, and proton logs to prevent unbounded disk growth
 find "$SERVER_LOG_DIR" -maxdepth 1 -type f -name "startup_*.log" 2>/dev/null | sort -r | tail -n +6 | xargs -r rm -f 2>/dev/null || true
 find "$WINETRICKS_LOG_DIR" -maxdepth 1 -type f -name "install_*.log" 2>/dev/null | sort -r | tail -n +6 | xargs -r rm -f 2>/dev/null || true
+find "$PROTON_LOG_DIR" -maxdepth 1 -type f \( -name "*.log" -o -name "steam-*" \) 2>/dev/null | sort -r | tail -n +6 | xargs -r rm -f 2>/dev/null || true
 
-# Enable Proton logging for debugging
-export PROTON_LOG=1
+# Enable Proton logging only when explicitly requested (PROTON_LOG=1) to avoid unbounded log growth
+export PROTON_LOG="${PROTON_LOG:-0}"
 
-# Enable verbose Wine logging for crash diagnosis (can be overridden).
+# Enable Wine error logging without warn+all flood (override via WINEDEBUG).
 # err-dxgi + -dxgi suppresses both err: and warn: EDID/display-metadata noise
 # on headless servers without a monitor.
 # err-seh suppresses "EXCEPTION handling: System.ComponentModel.Win32Exception:
 # Invalid window handle" spam from .NET/Mono apps - these are caught exceptions
 # flowing through Wine's SEH mechanism and are not real errors in headless mode.
 # Set WINEDEBUG=+all to restore full output.
-export WINEDEBUG="${WINEDEBUG:-warn+all,err-dxgi,-dxgi,err-seh}"
+export WINEDEBUG="${WINEDEBUG:-err+all,err-dxgi,-dxgi,err-seh}"
 
 # Track crashes and errors
 export PROTON_CRASH_REPORT_DIR="$PROTON_LOG_DIR"
 
-# Disable Steam client integration for dedicated servers (faster, less resources)
-export PROTON_NO_STEAM=1
+# Disable Steam client integration by default for dedicated servers (override via PROTON_NO_STEAM=0)
+export PROTON_NO_STEAM="${PROTON_NO_STEAM:-1}"
 
 # ----------------------------
 # Detect Unity headless / batchmode server
@@ -341,8 +343,6 @@ if [ "${UNITY_BATCHMODE:-0}" != "1" ]; then
     else
         info "Virtual display $DISPLAY already available"
     fi
-elif [ "${UNITY_BATCHMODE:-0}" != "1" ]; then
-    warning "Xvfb not found - headless SDL/Wine apps may fail"
 fi
 
 # Force software Vulkan (lavapipe) and software OpenGL on headless servers.
@@ -433,10 +433,12 @@ fi
 if [ "${WINE_CPU_TOPOLOGY:-}" = "" ]; then
     # Get actual CPU count - try multiple methods for compatibility
     CPU_COUNT=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || nproc 2>/dev/null || echo 4)
-    # Format: cores:threads (for most systems: count:1 or count:2)
-    # Most common: physical cores count with 1-2 threads per core
-    CORES=$(( CPU_COUNT > 4 ? CPU_COUNT / 2 : CPU_COUNT ))
-    export WINE_CPU_TOPOLOGY="${CORES}:2"
+    if [ "$CPU_COUNT" -gt 4 ]; then
+        CORES=$(( CPU_COUNT / 2 ))
+        export WINE_CPU_TOPOLOGY="${CORES}:2"
+    else
+        export WINE_CPU_TOPOLOGY="${CPU_COUNT}:1"
+    fi
     info "Wine CPU topology auto-detected: $WINE_CPU_TOPOLOGY"
 fi
 
@@ -456,7 +458,7 @@ fi
 if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
     export XDG_RUNTIME_DIR="/tmp/xdg-runtime-dir"
     mkdir -p "$XDG_RUNTIME_DIR"
-    chown 1000:1000 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+    chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
 fi
 
 # Ensure HOME is set
@@ -803,19 +805,22 @@ stream_game_logs() {
         "$HOME/.local/share/*/Saved/Logs/"
     )
 
-    for log_path in "${log_search_paths[@]}"; do
-        # Expand glob patterns
-        for found_log_dir in $log_path; do
-            if [ -d "$found_log_dir" ]; then
-                # Find most recent log file
-                latest_log=$(find "$found_log_dir" -type f -name "*.log" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)
-                if [ -n "$latest_log" ]; then
-                    info "Streaming game log: $latest_log"
-                    tail -c0 -F "$latest_log" --pid="$SERVER_PID" 2>/dev/null || true
-                    return 0
+    local attempt=0
+    while [ "$attempt" -lt 15 ] && kill -0 "$SERVER_PID" 2>/dev/null; do
+        for log_path in "${log_search_paths[@]}"; do
+            for found_log_dir in $log_path; do
+                if [ -d "$found_log_dir" ]; then
+                    latest_log=$(find "$found_log_dir" -type f -name "*.log" -newer "$SERVER_LOG" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)
+                    if [ -n "$latest_log" ]; then
+                        info "Streaming game log: $latest_log"
+                        tail -c0 -F "$latest_log" --pid="$SERVER_PID" 2>/dev/null || true
+                        return 0
+                    fi
                 fi
-            fi
+            done
         done
+        attempt=$((attempt + 1))
+        sleep 1
     done
 }
 
@@ -897,6 +902,10 @@ trap - ERR
 # the actual server PID rather than tee's PID.
 eval "$MODIFIED_STARTUP" > >(tee -a "$SERVER_LOG") 2>&1 &
 SERVER_PID=$!
+
+# Forward stop signals directly to the server process for clean shutdown/saving
+trap 'kill -INT "$SERVER_PID" 2>/dev/null || true' SIGINT
+trap 'kill -TERM "$SERVER_PID" 2>/dev/null || true' SIGTERM
 
 # Validate that the process was actually started
 if ! kill -0 "$SERVER_PID" 2>/dev/null; then
