@@ -247,14 +247,9 @@ find "$PROTON_LOG_DIR" -maxdepth 1 -type f \( -name "*.log" -o -name "steam-*" \
 # Enable Proton logging only when explicitly requested (PROTON_LOG=1) to avoid unbounded log growth
 export PROTON_LOG="${PROTON_LOG:-0}"
 
-# Enable Wine error logging without warn+all flood (override via WINEDEBUG).
-# err-dxgi + -dxgi suppresses both err: and warn: EDID/display-metadata noise
-# on headless servers without a monitor.
-# err-seh suppresses "EXCEPTION handling: System.ComponentModel.Win32Exception:
-# Invalid window handle" spam from .NET/Mono apps - these are caught exceptions
-# flowing through Wine's SEH mechanism and are not real errors in headless mode.
-# Set WINEDEBUG=+all to restore full output.
-export WINEDEBUG="${WINEDEBUG:-err+all,err-dxgi,-dxgi,err-seh}"
+# Suppress fixme/warn noise and headless-only false-positive errors; keep real err: output.
+# Override via WINEDEBUG (e.g. WINEDEBUG=+all for full debugging).
+export WINEDEBUG="${WINEDEBUG:-fixme-all,warn-all,err+all,err-dxgi,-dxgi,err-seh,err-openxr,err-wineusb,err-ntoskrnl}"
 
 # Track crashes and errors
 export PROTON_CRASH_REPORT_DIR="$PROTON_LOG_DIR"
@@ -423,33 +418,11 @@ if [ "${PROTON_USE_PROTONFIXES:-0}" = "1" ]; then
 fi
 
 # ----------------------------
-# Console Output Fixes
+# Proton Verbosity (quiet by default; set PROTON_VERBOSITY=2 for debugging)
 # ----------------------------
-# Modern Wine/Proton versions may suppress console output due to CPU topology detection.
-# The following environment variables help ensure proper console output.
-
-# Auto-detect CPU topology and enable console output (primary fix)
-# Modern systems may require this fix for proper console output in Proton
-if [ "${WINE_CPU_TOPOLOGY:-}" = "" ]; then
-    # Get actual CPU count - try multiple methods for compatibility
-    CPU_COUNT=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || nproc 2>/dev/null || echo 4)
-    if [ "$CPU_COUNT" -gt 4 ]; then
-        CORES=$(( CPU_COUNT / 2 ))
-        export WINE_CPU_TOPOLOGY="${CORES}:2"
-    else
-        export WINE_CPU_TOPOLOGY="${CPU_COUNT}:1"
-    fi
-    info "Wine CPU topology auto-detected: $WINE_CPU_TOPOLOGY"
-fi
-
-# Secondary console output fixes (optional, enable via environment variable)
-if [ "${WINE_CONSOLE_OUTPUT_FIX:-1}" = "1" ]; then
-    # Enable more verbose Proton logging to ensure console output
-    if [ "${PROTON_VERBOSITY:-}" = "" ]; then
-        export PROTON_VERBOSITY=2
-        info "Proton verbosity enabled (PROTON_VERBOSITY=2)"
-    fi
-fi
+# Note: WINE_CPU_TOPOLOGY must NOT be set as "cores:threads" (e.g. 3:2) because
+# Proton/Wine expects "count:id0,id1,..." and rejects "3:2" with fill_cpu_override errors.
+export PROTON_VERBOSITY="${PROTON_VERBOSITY:-0}"
 
 # Allow override for console debugging (less common, for advanced users)
 # Set WINE_NOCRASHDIALOG=1 and WINE_MONO_TRACE=all if crashes need capturing
